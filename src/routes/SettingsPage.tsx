@@ -27,7 +27,9 @@ import {
   unsubscribeFromPush,
   getCurrentSubscription,
 } from '@/lib/pushNotifications'
-import type { MemoryCategory, UserMemory } from '@/types/database'
+import type { UserMemory } from '@/types/database'
+
+type EditableCategory = 'people' | 'preferences' | 'context'
 
 const SUMMARY_TIMES = Object.keys(fi.summaryTime) as Array<keyof typeof fi.summaryTime>
 const MAX_MEMORIES = 30
@@ -106,7 +108,7 @@ export default function SettingsPage() {
     await supabase.auth.signOut()
   }
 
-  function handleMemorySave(content: string, category: MemoryCategory) {
+  function handleMemorySave(content: string, category: EditableCategory) {
     if (editingMemory) {
       updateMemory.mutate(
         { id: editingMemory.id, content, category },

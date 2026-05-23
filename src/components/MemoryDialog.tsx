@@ -11,27 +11,31 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { fi } from '@/i18n/fi'
-import type { MemoryCategory, UserMemory } from '@/types/database'
+import type { UserMemory } from '@/types/database'
+
+type EditableCategory = 'people' | 'preferences' | 'context'
 
 const MAX_CHARS = 500
-const CATEGORIES: MemoryCategory[] = ['people', 'preferences', 'context']
+const CATEGORIES: EditableCategory[] = ['people', 'preferences', 'context']
 
 interface Props {
   open: boolean
   onClose: () => void
-  onSave: (content: string, category: MemoryCategory) => void
+  onSave: (content: string, category: EditableCategory) => void
   saving?: boolean
   initialValues?: Pick<UserMemory, 'content' | 'category'>
 }
 
 export default function MemoryDialog({ open, onClose, onSave, saving, initialValues }: Props) {
   const [content, setContent] = useState(initialValues?.content ?? '')
-  const [category, setCategory] = useState<MemoryCategory>(initialValues?.category ?? 'context')
+  const [category, setCategory] = useState<EditableCategory>(
+    (initialValues?.category as EditableCategory | undefined) ?? 'context'
+  )
 
   useEffect(() => {
     if (open) {
       setContent(initialValues?.content ?? '')
-      setCategory(initialValues?.category ?? 'context')
+      setCategory((initialValues?.category as EditableCategory | undefined) ?? 'context')
     }
   }, [open, initialValues?.content, initialValues?.category])
 
@@ -50,7 +54,7 @@ export default function MemoryDialog({ open, onClose, onSave, saving, initialVal
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>{fi.memory.categoryLabel}</Label>
-            <Select value={category} onValueChange={(v) => setCategory(v as MemoryCategory)}>
+            <Select value={category} onValueChange={(v) => setCategory(v as EditableCategory)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
