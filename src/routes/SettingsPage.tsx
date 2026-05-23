@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { CheckCircle, AlertCircle, Pencil, Trash2, Plus } from 'lucide-react'
 import NavBar from '@/components/NavBar'
 import MemoryDialog from '@/components/MemoryDialog'
@@ -36,6 +37,8 @@ const MAX_MEMORIES = 30
 
 export default function SettingsPage() {
   const { user } = useUserStore()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: settings, refetch: refetchSettings } = useUserSettings(user?.id)
   const { data: memories } = useUserMemory(user?.id)
   const { data: profile } = useProfileMemory(user?.id)
@@ -70,9 +73,10 @@ export default function SettingsPage() {
     setGenerating(true)
     try {
       await callEdgeFunction('manual-generate-summary', { user_id: user.id })
+      await queryClient.invalidateQueries({ queryKey: ['latest-summary'] })
+      navigate('/')
     } catch (err) {
       console.error('Yhteenvedon generointi epäonnistui:', err)
-    } finally {
       setGenerating(false)
     }
   }
