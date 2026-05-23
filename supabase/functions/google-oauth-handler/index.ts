@@ -6,6 +6,11 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-client-info, apikey',
+}
+
 const REQUIRED_SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/gmail.readonly',
@@ -13,17 +18,12 @@ const REQUIRED_SCOPES = [
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, content-type, x-client-info, apikey',
-      },
-    })
+    return new Response(null, { headers: CORS_HEADERS })
   }
 
   const authHeader = req.headers.get('Authorization') ?? ''
   if (!authHeader.startsWith('Bearer ')) {
-    return Response.json({ ok: false, error: 'Ei autentikointia' }, { status: 401 })
+    return Response.json({ ok: false, error: 'Ei autentikointia' }, { status: 401, headers: CORS_HEADERS })
   }
 
   const userClient = createClient(supabaseUrl, anonKey, {
@@ -31,30 +31,29 @@ Deno.serve(async (req: Request) => {
   })
   const { data: { user }, error: userError } = await userClient.auth.getUser()
   if (userError || !user) {
-    return Response.json({ ok: false, error: 'Virheellinen token' }, { status: 401 })
+    return Response.json({ ok: false, error: 'Virheellinen token' }, { status: 401, headers: CORS_HEADERS })
   }
 
   let body: { code?: string; redirect_uri?: string }
   try {
     body = await req.json() as { code?: string; redirect_uri?: string }
   } catch {
-    return Response.json({ ok: false, error: 'Virheellinen request body' }, { status: 400 })
+    return Response.json({ ok: false, error: 'Virheellinen request body' }, { status: 400, headers: CORS_HEADERS })
   }
 
   if (!body.code || !body.redirect_uri) {
-    return Response.json({ ok: false, error: 'code ja redirect_uri vaaditaan' }, { status: 400 })
+    return Response.json({ ok: false, error: 'code ja redirect_uri vaaditaan' }, { status: 400, headers: CORS_HEADERS })
   }
 
   try {
     const tokens = await exchangeCodeForTokens(body.code, body.redirect_uri)
 
-    // Varmista että tarvittavat scopet saatiin
     const grantedScopes = tokens.scope.split(' ')
     const missingScopes = REQUIRED_SCOPES.filter(s => !grantedScopes.includes(s))
     if (missingScopes.length > 0) {
       return Response.json(
         { ok: false, error: `Puuttuvat scopet: ${missingScopes.join(', ')}` },
-        { status: 400 }
+        { status: 400, headers: CORS_HEADERS }
       )
     }
 
@@ -63,7 +62,6 @@ Deno.serve(async (req: Request) => {
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
-    // Tallenna tai päivitä token
     const { error: tokenError } = await adminClient
       .from('google_oauth_tokens')
       .upsert({
@@ -77,7 +75,6 @@ Deno.serve(async (req: Request) => {
 
     if (tokenError) throw tokenError
 
-    // Päivitä user_settings: google_email + reauth-lippu
     await adminClient
       .from('user_settings')
       .upsert({
@@ -89,9 +86,9 @@ Deno.serve(async (req: Request) => {
         google_email: userInfo.email,
       }, { onConflict: 'user_id' })
 
-    return Response.json({ ok: true, google_email: userInfo.email })
+    return Response.json({ ok: true, google_email: userInfo.email }, { headers: CORS_HEADERS })
   } catch (err) {
     console.error('google-oauth-handler virhe:', err)
-    return Response.json({ ok: false, error: String(err) }, { status: 500 })
+    return Response.json({ ok: false, error: String(err) }, { status: 500, headers: CORS_HEADERS })
   }
 })

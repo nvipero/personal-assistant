@@ -16,20 +16,20 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-client-info, apikey',
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, content-type, x-client-info, apikey',
-      },
-    })
+    return new Response(null, { headers: CORS_HEADERS })
   }
 
   // Autentikointi: käyttäjän JWT
   const authHeader = req.headers.get('Authorization') ?? ''
   if (!authHeader.startsWith('Bearer ')) {
-    return Response.json({ ok: false, error: 'Ei autentikointia' }, { status: 401 })
+    return Response.json({ ok: false, error: 'Ei autentikointia' }, { status: 401, headers: CORS_HEADERS })
   }
 
   const userClient = createClient(supabaseUrl, anonKey, {
@@ -37,7 +37,7 @@ Deno.serve(async (req: Request) => {
   })
   const { data: { user }, error: userError } = await userClient.auth.getUser()
   if (userError || !user) {
-    return Response.json({ ok: false, error: 'Virheellinen token' }, { status: 401 })
+    return Response.json({ ok: false, error: 'Virheellinen token' }, { status: 401, headers: CORS_HEADERS })
   }
 
   let body: { user_id?: string }
@@ -50,7 +50,7 @@ Deno.serve(async (req: Request) => {
   // Varmista että user_id vastaa autentikoitua käyttäjää
   const userId = body.user_id ?? user.id
   if (userId !== user.id) {
-    return Response.json({ ok: false, error: 'Ei oikeutta' }, { status: 403 })
+    return Response.json({ ok: false, error: 'Ei oikeutta' }, { status: 403, headers: CORS_HEADERS })
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey)
@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
 
     if (!settings) {
-      return Response.json({ ok: false, error: 'Asetuksia ei löydy' }, { status: 404 })
+      return Response.json({ ok: false, error: 'Asetuksia ei löydy' }, { status: 404, headers: CORS_HEADERS })
     }
 
     const { data: tokenRow } = await adminClient
@@ -73,7 +73,7 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
 
     if (!tokenRow) {
-      return Response.json({ ok: false, error: 'Google-tiliä ei yhdistetty' }, { status: 400 })
+      return Response.json({ ok: false, error: 'Google-tiliä ei yhdistetty' }, { status: 400, headers: CORS_HEADERS })
     }
 
     const refreshToken = await decryptToken(tokenRow.encrypted_refresh_token as unknown as Uint8Array)
@@ -147,9 +147,9 @@ Deno.serve(async (req: Request) => {
 
     if (saveError) throw saveError
 
-    return Response.json({ ok: true, summary_id: saved.id, summary_text: summaryText })
+    return Response.json({ ok: true, summary_id: saved.id, summary_text: summaryText }, { headers: CORS_HEADERS })
   } catch (err) {
     console.error('manual-generate-summary virhe:', err)
-    return Response.json({ ok: false, error: String(err) }, { status: 500 })
+    return Response.json({ ok: false, error: String(err) }, { status: 500, headers: CORS_HEADERS })
   }
 })
