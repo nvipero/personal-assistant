@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
 
     if (tokenError) throw tokenError
 
-    // Luo user_settings -rivi jos ei ole vielä
+    // Päivitä user_settings: google_email + reauth-lippu
     await adminClient
       .from('user_settings')
       .upsert({
@@ -86,7 +86,8 @@ Deno.serve(async (req: Request) => {
         timezone: 'Europe/Helsinki',
         push_enabled: true,
         needs_google_reauth: false,
-      }, { onConflict: 'user_id', ignoreDuplicates: true })
+        google_email: userInfo.email,
+      }, { onConflict: 'user_id' })
 
     return Response.json({ ok: true, google_email: userInfo.email })
   } catch (err) {

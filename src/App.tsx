@@ -74,6 +74,14 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/connect-google/callback"
+          element={
+            <ProtectedRoute>
+              <ConnectGooglePage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -14,6 +14,7 @@ export interface Database {
           timezone: string
           push_enabled: boolean
           needs_google_reauth: boolean
+          google_email: string | null
           created_at: string
           updated_at: string
         }
@@ -23,6 +24,7 @@ export interface Database {
           timezone?: string
           push_enabled?: boolean
           needs_google_reauth?: boolean
+          google_email?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -31,6 +33,7 @@ export interface Database {
           timezone?: string
           push_enabled?: boolean
           needs_google_reauth?: boolean
+          google_email?: string | null
           updated_at?: string
         }
         Relationships: []
