@@ -1,18 +1,19 @@
 -- Token-salauksen apufunktiot — kutsutaan Edge Functioneista service_role:lla
+-- search_path sisältää extensions-skeeman koska pgcrypto on siellä Supabasessa
 
 create or replace function public.encrypt_token(
   plaintext text,
   key_hex text
 ) returns bytea as $$
   select pgp_sym_encrypt(plaintext, key_hex);
-$$ language sql security definer;
+$$ language sql security definer set search_path = public, extensions;
 
 create or replace function public.decrypt_token(
   ciphertext bytea,
   key_hex text
 ) returns text as $$
   select pgp_sym_decrypt(ciphertext, key_hex);
-$$ language sql security definer;
+$$ language sql security definer set search_path = public, extensions;
 
 -- Vain service_role saa kutsua
 revoke all on function public.encrypt_token(text, text) from public, anon, authenticated;
