@@ -44,10 +44,14 @@ async function makeVapidJwt(audience: string): Promise<string> {
     )
   )
 
-  const keyBytes = base64UrlDecode(VAPID_PRIVATE_KEY)
+  // VAPID public key: 65 tavua (04 || x || y), poimitaan x ja y JWK-importtia varten
+  const pubKeyBytes = base64UrlDecode(VAPID_PUBLIC_KEY)
+  const x = base64UrlEncode(pubKeyBytes.slice(1, 33).buffer as ArrayBuffer)
+  const y = base64UrlEncode(pubKeyBytes.slice(33, 65).buffer as ArrayBuffer)
+
   const privateKey = await crypto.subtle.importKey(
-    'pkcs8',
-    keyBytes,
+    'jwk',
+    { kty: 'EC', crv: 'P-256', d: VAPID_PRIVATE_KEY, x, y, key_ops: ['sign'], ext: false },
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
