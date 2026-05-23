@@ -10,6 +10,7 @@ import { fetchUserMemories, formatMemoriesForPrompt } from '../_shared/memory.ts
 import { getSpecialDay } from '../_shared/holidays.ts'
 import { googleCalendarConnector } from '../_shared/connectors/google-calendar.ts'
 import { gmailConnector } from '../_shared/connectors/gmail.ts'
+import { sendPushNotification } from '../_shared/push.ts'
 import { toZonedTime } from 'https://esm.sh/date-fns-tz@3'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -147,9 +148,42 @@ Deno.serve(async (req: Request) => {
 
     if (saveError) throw saveError
 
+    // Push-notifikaatio
+    const teaser = summaryText.split('\n').slice(0, 2).join(' ')
+    await sendPushToUser(adminClient, userId, {
+      title: 'Päivän yhteenveto',
+      body: teaser.slice(0, 150),
+      url: '/',
+    })
+
     return Response.json({ ok: true, summary_id: saved.id, summary_text: summaryText }, { headers: CORS_HEADERS })
   } catch (err) {
     console.error('manual-generate-summary virhe:', err)
     return Response.json({ ok: false, error: String(err) }, { status: 500, headers: CORS_HEADERS })
   }
 })
+
+async function sendPushToUser(
+  adminClient: ReturnType<typeof createClient>,
+  userId: string,
+  payload: { title: string; body: string; url: string }
+) {
+  const { data: subs } = await adminClient
+    .from('push_subscriptions')
+    .select('id, endpoint, p256dh_key, auth_key')
+    .eq('user_id', userId)
+
+  if (!subs?.length) return
+
+  await Promise.all(
+    subs.map(async sub => {
+      const result = await sendPushNotification(
+        { endpoint: sub.endpoint, p256dh_key: sub.p256dh_key, auth_key: sub.auth_key },
+        payload
+      )
+      if (result.status === 410 || result.status === 404) {
+        await adminClient.from('push_subscriptions').delete().eq('id', sub.id)
+      }
+    })
+  )
+}
