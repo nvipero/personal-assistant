@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
 import NavBar from '@/components/NavBar'
@@ -18,9 +18,11 @@ export default function ConnectGooglePage() {
   const [connectedEmail, setConnectedEmail] = useState('')
 
   const code = searchParams.get('code')
+  const codeUsed = useRef(false)
 
   useEffect(() => {
-    if (!code) return
+    if (!code || codeUsed.current) return
+    codeUsed.current = true
 
     setStatus('loading')
     callEdgeFunction<{ ok: boolean; google_email?: string; error?: string }>(
