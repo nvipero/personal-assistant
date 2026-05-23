@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle, AlertCircle } from 'lucide-react'
+import { CheckCircle, AlertCircle, Pencil, Trash2, Plus } from 'lucide-react'
 import NavBar from '@/components/NavBar'
+import MemoryDialog from '@/components/MemoryDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import { fi } from '@/i18n/fi'
 import { useUserStore } from '@/stores/userStore'
 import { useUserSettings } from '@/hooks/useUserSettings'
+import { useUserMemory, useAddMemory, useUpdateMemory, useDeleteMemory } from '@/hooks/useUserMemory'
+import { useProfileMemory, useSaveProfile } from '@/hooks/useProfileMemory'
 import { callEdgeFunction } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import {
@@ -20,20 +25,40 @@ import {
   unsubscribeFromPush,
   getCurrentSubscription,
 } from '@/lib/pushNotifications'
+import type { MemoryCategory, UserMemory } from '@/types/database'
 
 const SUMMARY_TIMES = Object.keys(fi.summaryTime) as Array<keyof typeof fi.summaryTime>
+const MAX_MEMORIES = 30
 
 export default function SettingsPage() {
   const { user } = useUserStore()
-  const { data: settings, refetch } = useUserSettings(user?.id)
+  const { data: settings, refetch: refetchSettings } = useUserSettings(user?.id)
+  const { data: memories } = useUserMemory(user?.id)
+  const { data: profile } = useProfileMemory(user?.id)
+
+  const addMemory = useAddMemory(user?.id)
+  const updateMemory = useUpdateMemory(user?.id)
+  const deleteMemory = useDeleteMemory(user?.id)
+  const saveProfile = useSaveProfile(user?.id)
+
   const [generating, setGenerating] = useState(false)
   const [pushActive, setPushActive] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
   const [pushError, setPushError] = useState<string | null>(null)
 
+  const [memoryDialogOpen, setMemoryDialogOpen] = useState(false)
+  const [editingMemory, setEditingMemory] = useState<UserMemory | null>(null)
+
+  const [profileValues, setProfileValues] = useState({ people: '', preferences: '', context: '' })
+  const [profileSaved, setProfileSaved] = useState(false)
+
   useEffect(() => {
     getCurrentSubscription().then((sub) => setPushActive(!!sub))
   }, [])
+
+  useEffect(() => {
+    if (profile) setProfileValues(profile)
+  }, [profile])
 
   async function handleGenerateNow() {
     if (!user) return
@@ -49,10 +74,8 @@ export default function SettingsPage() {
 
   async function handleTimeChange(time: string) {
     if (!user) return
-    await supabase
-      .from('user_settings')
-      .upsert({ user_id: user.id, summary_time: time })
-    refetch()
+    await supabase.from('user_settings').upsert({ user_id: user.id, summary_time: time })
+    refetchSettings()
   }
 
   async function handlePushToggle(enable: boolean) {
@@ -62,17 +85,13 @@ export default function SettingsPage() {
       if (enable) {
         await subscribeToPush()
         setPushActive(true)
-        await supabase
-          .from('user_settings')
-          .upsert({ user_id: user!.id, push_enabled: true })
+        await supabase.from('user_settings').upsert({ user_id: user!.id, push_enabled: true })
       } else {
         await unsubscribeFromPush()
         setPushActive(false)
-        await supabase
-          .from('user_settings')
-          .upsert({ user_id: user!.id, push_enabled: false })
+        await supabase.from('user_settings').upsert({ user_id: user!.id, push_enabled: false })
       }
-      refetch()
+      refetchSettings()
     } catch (err) {
       setPushError(err instanceof Error ? err.message : fi.errors.pushSubscriptionFailed)
     } finally {
@@ -84,8 +103,33 @@ export default function SettingsPage() {
     await supabase.auth.signOut()
   }
 
+  function handleMemorySave(content: string, category: MemoryCategory) {
+    if (editingMemory) {
+      updateMemory.mutate(
+        { id: editingMemory.id, content, category },
+        { onSuccess: () => { setMemoryDialogOpen(false); setEditingMemory(null) } }
+      )
+    } else {
+      addMemory.mutate(
+        { content, category, source: 'manual_edit' },
+        { onSuccess: () => setMemoryDialogOpen(false) }
+      )
+    }
+  }
+
+  function handleProfileSave() {
+    saveProfile.mutate(profileValues, {
+      onSuccess: () => {
+        setProfileSaved(true)
+        setTimeout(() => setProfileSaved(false), 2000)
+      },
+    })
+  }
+
   const googleConnected = !!settings?.google_email
   const showIosHint = isPushSupported() && !isRunningAsStandalone()
+  const memoryCount = memories?.length ?? 0
+  const atMemoryLimit = memoryCount >= MAX_MEMORIES
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -131,12 +175,133 @@ export default function SettingsPage() {
 
         <Separator />
 
+        {/* Tunne minut — profiili */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{fi.settings.knowMe}</CardTitle>
+            <CardDescription className="text-xs">{fi.settings.knowMeDescription}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">{fi.settings.profilePeople}</Label>
+              <Textarea
+                placeholder={fi.settings.profilePeoplePlaceholder}
+                value={profileValues.people}
+                onChange={(e) => setProfileValues((v) => ({ ...v, people: e.target.value }))}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">{fi.settings.profilePreferences}</Label>
+              <Textarea
+                placeholder={fi.settings.profilePreferencesPlaceholder}
+                value={profileValues.preferences}
+                onChange={(e) => setProfileValues((v) => ({ ...v, preferences: e.target.value }))}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-medium">{fi.settings.profileContext}</Label>
+              <Textarea
+                placeholder={fi.settings.profileContextPlaceholder}
+                value={profileValues.context}
+                onChange={(e) => setProfileValues((v) => ({ ...v, context: e.target.value }))}
+                rows={3}
+                className="text-sm"
+              />
+            </div>
+            <Button
+              onClick={handleProfileSave}
+              disabled={saveProfile.isPending}
+              className="w-full"
+            >
+              {profileSaved
+                ? fi.settings.saved
+                : saveProfile.isPending
+                  ? fi.settings.saving
+                  : fi.settings.saveProfile}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* Muistilista */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">{fi.settings.memories}</CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => { setEditingMemory(null); setMemoryDialogOpen(true) }}
+                disabled={atMemoryLimit}
+                className="gap-1"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {fi.settings.addMemory}
+              </Button>
+            </div>
+            <CardDescription className="text-xs">
+              {fi.settings.memoriesCount(memoryCount)}
+              {atMemoryLimit && (
+                <span className="text-destructive ml-1">{fi.settings.memoriesWarning}</span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!memories?.length ? (
+              <p className="text-sm text-muted-foreground">Ei muisteja vielä.</p>
+            ) : (
+              <div className="space-y-2">
+                {memories.map((mem) => (
+                  <div
+                    key={mem.id}
+                    className="flex items-start gap-2 rounded-md border p-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          {fi.settings.memoryCategories[mem.category as keyof typeof fi.settings.memoryCategories]}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground break-words">{mem.content}</p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={() => { setEditingMemory(mem); setMemoryDialogOpen(true) }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => deleteMemory.mutate(mem.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Separator />
+
         {/* Yhteydet */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{fi.settings.connections}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2 min-w-0">
                 {googleConnected ? (
@@ -169,9 +334,7 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="text-base">{fi.settings.pushNotifications}</CardTitle>
             {showIosHint && (
-              <CardDescription className="text-xs">
-                {fi.settings.pushIosHint}
-              </CardDescription>
+              <CardDescription className="text-xs">{fi.settings.pushIosHint}</CardDescription>
             )}
           </CardHeader>
           <CardContent className="space-y-3">
@@ -192,9 +355,7 @@ export default function SettingsPage() {
                 Selaimesi ei tue push-notifikaatioita.
               </p>
             )}
-            {pushError && (
-              <p className="text-xs text-destructive">{pushError}</p>
-            )}
+            {pushError && <p className="text-xs text-destructive">{pushError}</p>}
           </CardContent>
         </Card>
 
@@ -213,6 +374,14 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </main>
+
+      <MemoryDialog
+        open={memoryDialogOpen}
+        onClose={() => { setMemoryDialogOpen(false); setEditingMemory(null) }}
+        onSave={handleMemorySave}
+        saving={addMemory.isPending || updateMemory.isPending}
+        initialValues={editingMemory ?? undefined}
+      />
 
       <NavBar />
     </div>
