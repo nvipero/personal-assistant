@@ -16,7 +16,9 @@ import { useUserStore } from '@/stores/userStore'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { useUserMemory, useAddMemory, useUpdateMemory, useDeleteMemory } from '@/hooks/useUserMemory'
 import { useProfileMemory, useSaveProfile } from '@/hooks/useProfileMemory'
+import { useCostStats } from '@/hooks/useCostStats'
 import { callEdgeFunction } from '@/lib/api'
+import { formatCostEur } from '@/lib/format'
 import { supabase } from '@/lib/supabase'
 import {
   isPushSupported,
@@ -35,6 +37,7 @@ export default function SettingsPage() {
   const { data: settings, refetch: refetchSettings } = useUserSettings(user?.id)
   const { data: memories } = useUserMemory(user?.id)
   const { data: profile } = useProfileMemory(user?.id)
+  const { data: costStats } = useCostStats(user?.id)
 
   const addMemory = useAddMemory(user?.id)
   const updateMemory = useUpdateMemory(user?.id)
@@ -358,6 +361,37 @@ export default function SettingsPage() {
             {pushError && <p className="text-xs text-destructive">{pushError}</p>}
           </CardContent>
         </Card>
+
+        <Separator />
+
+        {/* Kustannukset */}
+        {costStats && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{fi.settings.costs}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[
+                { label: fi.settings.costsThisMonth, stats: costStats.thisMonth },
+                { label: fi.settings.costsLastMonth, stats: costStats.lastMonth },
+              ].map(({ label, stats }) => (
+                <div key={label}>
+                  <div className="text-xs font-medium text-muted-foreground mb-2">{label}</div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <span className="text-muted-foreground">{fi.settings.summaries}</span>
+                    <span className="text-right">{stats.count}</span>
+                    <span className="text-muted-foreground">{fi.settings.inputTokens}</span>
+                    <span className="text-right">{stats.inputTokens.toLocaleString('fi')}</span>
+                    <span className="text-muted-foreground">{fi.settings.outputTokens}</span>
+                    <span className="text-right">{stats.outputTokens.toLocaleString('fi')}</span>
+                    <span className="text-muted-foreground">{fi.settings.estimatedCost}</span>
+                    <span className="text-right font-medium">{formatCostEur(stats.costUsd)}</span>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <Separator />
 
