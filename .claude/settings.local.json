@@ -3,7 +3,9 @@
     "allow": [
       "Bash(pnpm add *)",
       "Bash(pnpm tsc *)",
-      "Bash(pnpm build *)"
+      "Bash(pnpm build *)",
+      "Bash(git commit *)",
+      "Bash(supabase --version)"
     ]
   }
 }
