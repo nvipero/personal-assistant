@@ -55,14 +55,15 @@ export async function generateMemorySuggestion(
 ): Promise<{ memory: string | null; category?: string }> {
   const systemPrompt = `Olet apuri joka muuttaa käyttäjän antaman palautteen pysyväksi muistiinpanoksi seuraavia yhteenvetoja varten.
 
-Käyttäjä antoi yhteenvedosta palautteen. Tehtäväsi on muotoilla palaute yleistettäväksi ohjeeksi, joka voidaan ottaa huomioon kaikissa tulevissa yhteenvedoissa.
+Tehtäväsi on tunnistaa palautteesta käyttäjän preferenssi tai tieto ja muotoilla se ohjeeksi tulevia yhteenvetoja varten.
 
 Säännöt:
-- Jos palaute on yleistettävää, vastaa JSON-objektilla: {"memory": "<lyhyt ohje>", "category": "people|preferences|context|feedback"}
-- Jos palaute koskee vain yksittäistä tapausta eikä yleisty, vastaa: {"memory": null}
+- Tallenna AINA jos palaute sisältää: nimitoiveen, tyylipreferenssin, tietoa henkilöistä, toiveen sisällöstä tai muotoilusta
+- Vastaa JSON-objektilla: {"memory": "<lyhyt ohje>", "category": "people|preferences|context|feedback"}
+- Jätä tallentamatta VAIN jos palaute on täysin kertaluonteinen eikä sisällä mitään yleistettävää (esim. "ok" tai "selvä")
 - Älä keksi tietoa joka ei ole palautteessa
 - Pidä muisti lyhyenä (max 2 lausetta)
-- Käytä kolmatta persoonaa ("Käyttäjä..." tai "Yhteenvedoissa pitäisi...")`
+- Kirjoita muisti ohjeena: "Käyttäjän nimi on Niko." tai "Yhteenvedoissa pitäisi..."`
 
   const userPrompt = `PALAUTE: "${feedbackComment}"
 YHTEENVEDON KONTEKSTI: ${summaryContext}`
@@ -88,9 +89,13 @@ YHTEENVEDON KONTEKSTI: ${summaryContext}`
   const json = await res.json() as AnthropicResponse
   const text = json.content.find(c => c.type === 'text')?.text ?? ''
 
+  // Strip markdown code fences if Claude wraps the JSON
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+
   try {
-    return JSON.parse(text) as { memory: string | null; category?: string }
+    return JSON.parse(cleaned) as { memory: string | null; category?: string }
   } catch {
+    console.error(`generateMemorySuggestion parse error, raw text: ${text}`)
     return { memory: null }
   }
 }

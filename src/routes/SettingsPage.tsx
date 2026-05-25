@@ -6,6 +6,7 @@ import NavBar from '@/components/NavBar'
 import MemoryDialog from '@/components/MemoryDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
@@ -56,6 +57,7 @@ export default function SettingsPage() {
 
   const [memoryDialogOpen, setMemoryDialogOpen] = useState(false)
   const [editingMemory, setEditingMemory] = useState<UserMemory | null>(null)
+  const [deletingMemory, setDeletingMemory] = useState<UserMemory | null>(null)
 
   const [profileValues, setProfileValues] = useState({ people: '', preferences: '', context: '' })
   const [profileSaved, setProfileSaved] = useState(false)
@@ -291,7 +293,7 @@ export default function SettingsPage() {
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => deleteMemory.mutate(mem.id)}
+                        onClick={() => setDeletingMemory(mem)}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -422,6 +424,29 @@ export default function SettingsPage() {
         saving={addMemory.isPending || updateMemory.isPending}
         initialValues={editingMemory ?? undefined}
       />
+
+      <Dialog open={!!deletingMemory} onOpenChange={(open) => { if (!open) setDeletingMemory(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Poistetaanko muisti?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{deletingMemory?.content}</p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeletingMemory(null)}>Peruuta</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMemory.isPending}
+              onClick={() => {
+                if (deletingMemory) {
+                  deleteMemory.mutate(deletingMemory.id, { onSuccess: () => setDeletingMemory(null) })
+                }
+              }}
+            >
+              Poista
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <NavBar />
     </div>

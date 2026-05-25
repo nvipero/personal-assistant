@@ -7,7 +7,8 @@ declare const self: ServiceWorkerGlobalScope
 precacheAndRoute(self.__WB_MANIFEST)
 
 self.addEventListener('push', (event: PushEvent) => {
-  const data = event.data?.json() as { title?: string; body?: string; url?: string } | undefined ?? {}
+  let data: { title?: string; body?: string; url?: string } = {}
+  try { data = event.data?.json() ?? {} } catch { data = { body: event.data?.text() ?? '' } }
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'Päivän yhteenveto', {
       body: data.body ?? 'Avaa nähdäksesi.',
