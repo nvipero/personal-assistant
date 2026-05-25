@@ -12,7 +12,8 @@ export function calculateCostUsd(
   inputTokens: number,
   outputTokens: number
 ): number {
-  const pricing = MODEL_PRICING_USD[model as ModelId]
+  const key = (Object.keys(MODEL_PRICING_USD) as ModelId[]).find(k => model.startsWith(k))
+  const pricing = key ? MODEL_PRICING_USD[key] : undefined
   if (!pricing) return 0
   return (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output
 }
