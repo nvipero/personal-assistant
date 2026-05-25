@@ -168,7 +168,7 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label>{fi.settings.summaryTime}</Label>
               <Select
-                value={settings?.summary_time ?? '07:00'}
+                value={(settings?.summary_time ?? '07:00').slice(0, 5)}
                 onValueChange={handleTimeChange}
               >
                 <SelectTrigger>
