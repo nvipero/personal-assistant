@@ -51,6 +51,7 @@ export default function SettingsPage() {
   const saveProfile = useSaveProfile(user?.id)
 
   const [generating, setGenerating] = useState(false)
+  const [timeSaved, setTimeSaved] = useState(false)
   const [pushActive, setPushActive] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
   const [pushError, setPushError] = useState<string | null>(null)
@@ -85,8 +86,17 @@ export default function SettingsPage() {
 
   async function handleTimeChange(time: string) {
     if (!user) return
-    await supabase.from('user_settings').upsert({ user_id: user.id, summary_time: time })
-    refetchSettings()
+    const { error } = await supabase
+      .from('user_settings')
+      .update({ summary_time: time })
+      .eq('user_id', user.id)
+    if (!error) {
+      setTimeSaved(true)
+      setTimeout(() => setTimeSaved(false), 2000)
+      refetchSettings()
+    } else {
+      console.error('Aikavalinta ei tallentunut:', error)
+    }
   }
 
   async function handlePushToggle(enable: boolean) {
@@ -172,6 +182,7 @@ export default function SettingsPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {timeSaved && <p className="text-xs text-green-600">{fi.settings.saved}</p>}
             </div>
             <Button
               variant="outline"
