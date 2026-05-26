@@ -104,22 +104,23 @@ export function buildUserPrompt(ctx: SummaryContext): string {
 }
 
 export function parseSummaryResponse(responseText: string): ParsedSummaryResponse {
-  const lines = responseText.split('\n').map(l => l.trim()).filter(Boolean)
-  const lastLine = lines[lines.length - 1]
+  const lines = responseText.split('\n')
+  const lastNonEmptyIndex = lines.reduce((acc, l, i) => l.trim() ? i : acc, -1)
+  const lastNonEmpty = lastNonEmptyIndex >= 0 ? lines[lastNonEmptyIndex].trim() : ''
 
   let referencedEmailIds: string[] = []
   let referencedEventIds: string[] = []
-  let summaryText = responseText
+  let summaryText = responseText.trim()
 
-  if (lastLine.startsWith('{') && lastLine.endsWith('}')) {
+  if (lastNonEmpty.startsWith('{') && lastNonEmpty.endsWith('}')) {
     try {
-      const parsed = JSON.parse(lastLine) as {
+      const parsed = JSON.parse(lastNonEmpty) as {
         referenced_email_ids?: string[]
         referenced_event_ids?: string[]
       }
       referencedEmailIds = parsed.referenced_email_ids ?? []
       referencedEventIds = parsed.referenced_event_ids ?? []
-      summaryText = lines.slice(0, -1).join('\n').trim()
+      summaryText = lines.slice(0, lastNonEmptyIndex).join('\n').trim()
     } catch {
       // Jos parsinta epäonnistuu, käytetään koko teksti ja tyhjät viitteet
       console.error('JSON-rivin parsinta epäonnistui, jatketaan ilman viitteitä')
