@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import type { SummaryContext, ParsedSummaryResponse } from './types.ts'
 import type { WeatherForecast } from './connectors/weather.ts'
+import type { PollenData } from './connectors/pollen.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -120,6 +121,23 @@ export function buildWeatherBlock(w: WeatherForecast): string {
   }
   if (w.maxWindMs !== null) lines.push(`Tuuli: ${Math.round(w.maxWindMs)} m/s`)
   if (w.symbol) lines.push(`Yleiskuva keskipäivällä: ${w.symbol.description}`)
+  return lines.join('\n')
+}
+
+export function buildPollenBlock(pollen: PollenData, include: boolean, antihistamine: boolean): string {
+  const levelStr = (n: number) => ['ei', 'vähän', 'kohtalaisesti', 'runsaasti'][n] ?? 'ei'
+
+  const lines = [
+    `[SIITEPÖLY — Helsinki]`,
+    `Nyt: koivu ${levelStr(pollen.today.K)}, heinät ${levelStr(pollen.today.H)}`,
+    `Ennuste ${pollen.forecast.range}: koivu ${levelStr(pollen.forecast.K)}, heinät ${levelStr(pollen.forecast.H)}`,
+    `Antihistamiinimuistutus tarpeen: ${antihistamine ? 'kyllä' : 'ei'}`,
+  ]
+  if (pollen.forecast_text) {
+    lines.push(`Ennusteen vapaa teksti: """${pollen.forecast_text}"""`)
+  }
+  lines.push('')
+  lines.push('Kirjoita 1–3 lauseen kappale. Jos antihistamiinimuistutus on kyllä, mainitse lääke luontevasti. Jos vapaassa tekstissä mainitaan koivun kukinnan alkaminen Etelä-Suomessa lähipäivinä, nosta se esiin. Älä keksi mitään mitä datassa ei ole.')
   return lines.join('\n')
 }
 

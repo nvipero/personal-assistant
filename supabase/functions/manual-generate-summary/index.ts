@@ -5,12 +5,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { refreshAccessToken } from '../_shared/google.ts'
 import { decryptToken } from '../_shared/crypto.ts'
 import { generateSummary } from '../_shared/anthropic.ts'
-import { fetchActiveSystemPrompt, fetchFewShotExamples, buildUserPrompt, buildWeatherBlock, parseSummaryResponse } from '../_shared/prompts.ts'
+import { fetchActiveSystemPrompt, fetchFewShotExamples, buildUserPrompt, buildWeatherBlock, buildPollenBlock, parseSummaryResponse } from '../_shared/prompts.ts'
 import { fetchUserMemories, formatMemoriesForPrompt } from '../_shared/memory.ts'
 import { getSpecialDay } from '../_shared/holidays.ts'
 import { googleCalendarConnector } from '../_shared/connectors/google-calendar.ts'
 import { gmailConnector } from '../_shared/connectors/gmail.ts'
 import { fetchWeather } from '../_shared/connectors/weather.ts'
+import { fetchPollenForDate } from '../_shared/connectors/pollen.ts'
 import { sendPushNotification } from '../_shared/push.ts'
 import { toZonedTime } from 'https://esm.sh/date-fns-tz@3'
 
@@ -95,12 +96,16 @@ Deno.serve(async (req: Request) => {
 
     const summaryDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
-    const [calendarOutput, gmailOutput, weatherForecast] = await Promise.all([
+    const month = today.getMonth() + 1
+    const isPollenSeason = month >= 3 && month <= 9
+
+    const [calendarOutput, gmailOutput, weatherForecast, pollenData] = await Promise.all([
       googleCalendarConnector.fetch(connectorCtx as Parameters<typeof googleCalendarConnector.fetch>[0]),
       gmailConnector.fetch(connectorCtx as Parameters<typeof gmailConnector.fetch>[0]),
       settings.weather_enabled
         ? fetchWeather({ place: settings.weather_place ?? 'helsinki', date: summaryDate, timezone: settings.timezone })
         : Promise.resolve(null),
+      isPollenSeason ? fetchPollenForDate(summaryDate) : Promise.resolve(null),
     ])
 
     const [baseSystemPrompt, fewShotMessages, memories] = await Promise.all([
@@ -118,6 +123,17 @@ Deno.serve(async (req: Request) => {
 
     const weatherBlock = weatherForecast ? buildWeatherBlock(weatherForecast) : null
 
+    let pollenBlock: string | null = null
+    if (pollenData) {
+      const include = pollenData.today.K >= 2 || pollenData.today.H >= 2
+        || pollenData.forecast.K >= 2 || pollenData.forecast.H >= 2
+      const antihistamine = pollenData.today.K >= 2 || pollenData.today.H >= 2
+        || pollenData.forecast.K >= 2 || pollenData.forecast.H >= 2
+      if (include) {
+        pollenBlock = buildPollenBlock(pollenData, include, antihistamine)
+      }
+    }
+
     const userPrompt = buildUserPrompt({
       userFirstName: capitalizedName,
       userEmail: tokenRow.google_email,
@@ -127,6 +143,7 @@ Deno.serve(async (req: Request) => {
       emails: gmailOutput.items,
       specialDay: specialDay ?? undefined,
     }) + (weatherBlock ? `\n\n${weatherBlock}` : '')
+      + (pollenBlock ? `\n\n${pollenBlock}` : '')
 
     const allMessages = [
       ...fewShotMessages,
