@@ -218,6 +218,41 @@ export interface Database {
         }
         Relationships: []
       }
+      user_integrations: {
+        Row: {
+          id: string
+          user_id: string
+          provider: string
+          access_token: string
+          scopes: string[]
+          connected_at: string
+          last_used_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          provider: string
+          access_token: string
+          scopes?: string[]
+          connected_at?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          access_token?: string
+          scopes?: string[]
+          last_used_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
+      oauth_states: {
+        Row: { state: string; user_id: string; provider: string; created_at: string }
+        Insert: { state: string; user_id: string; provider: string; created_at?: string }
+        Update: Record<string, never>
+        Relationships: []
+      }
     }
     Views: {}
     Functions: {}
@@ -233,6 +268,9 @@ export type PushSubscription_ = Database['public']['Tables']['push_subscriptions
 export type UserMemory = Database['public']['Tables']['user_memory']['Row']
 export type SummaryFeedback = Database['public']['Tables']['summary_feedback']['Row']
 export type GoogleOAuthToken = Database['public']['Tables']['google_oauth_tokens']['Row']
+
+export type UserIntegration = Database['public']['Tables']['user_integrations']['Row']
+export type OAuthState = Database['public']['Tables']['oauth_states']['Row']
 
 export type MemoryCategory = UserMemory['category']
 export type MemorySource = UserMemory['source']

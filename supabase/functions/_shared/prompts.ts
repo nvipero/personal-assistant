@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import type { SummaryContext, ParsedSummaryResponse } from './types.ts'
 import type { WeatherForecast } from './connectors/weather.ts'
 import type { PollenData } from './connectors/pollen.ts'
+import type { TodoistData } from './connectors/todoist.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -134,6 +135,56 @@ export function buildPollenBlock(pollen: PollenData): string {
   if (pollen.forecast_text) {
     lines.push(`- Ennusteen vapaa teksti:\n"""\n${pollen.forecast_text}\n"""`)
   }
+  return lines.join('\n')
+}
+
+export function buildTodoistBlock(data: TodoistData): string {
+  const FI_DAYS = ['su', 'ma', 'ti', 'ke', 'to', 'pe', 'la']
+  const uiPriority = (p: number) => `p${5 - p}`
+  const taskLine = (task: { content: string; priority: number; due?: { date: string; datetime?: string; is_recurring: boolean }; project_id: string; labels: string[] }, d: TodoistData, prefix = '') => {
+    const time = task.due?.datetime
+      ? new Date(task.due.datetime).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' }) + ' '
+      : ''
+    const recurring = task.due?.is_recurring ? 'recurring=true' : 'recurring=false'
+    const prio = uiPriority(task.priority)
+    const project = d.projectNames[task.project_id] ? `, projekti: ${d.projectNames[task.project_id]}` : ''
+    return `- ${prefix}${time}"${task.content}" [${recurring}, ${prio}${project}]`
+  }
+
+  const lines = ['=== TODOIST ===']
+
+  lines.push(`Tänään (${data.today.length}):`)
+  if (data.today.length === 0) {
+    lines.push('(ei tehtäviä)')
+  } else {
+    for (const t of data.today) lines.push(taskLine(t, data))
+  }
+
+  lines.push('')
+  lines.push(`Myöhässä (${data.overdue.length}):`)
+  if (data.overdue.length === 0) {
+    lines.push('(ei myöhässä olevia)')
+  } else {
+    for (const t of data.overdue) {
+      const due = new Date(t.due!.date)
+      const todayDate = new Date()
+      const diffDays = Math.round((todayDate.getTime() - due.getTime()) / (1000 * 60 * 60 * 24))
+      lines.push(taskLine(t, data, `(-${diffDays} pv) `))
+    }
+  }
+
+  lines.push('')
+  lines.push(`Tulevat tärkeät, 7 pv (${data.upcoming.length}):`)
+  if (data.upcoming.length === 0) {
+    lines.push('(ei tulevia tärkeitä)')
+  } else {
+    for (const t of data.upcoming) {
+      const due = new Date(t.due!.date)
+      const dayName = FI_DAYS[due.getDay()]
+      lines.push(taskLine(t, data, `${dayName} `))
+    }
+  }
+
   return lines.join('\n')
 }
 

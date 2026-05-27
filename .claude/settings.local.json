@@ -5,7 +5,8 @@
       "Bash(pnpm tsc *)",
       "Bash(pnpm build *)",
       "Bash(git commit *)",
-      "Bash(supabase --version)"
+      "Bash(supabase --version)",
+      "Bash(supabase db *)"
     ]
   }
 }

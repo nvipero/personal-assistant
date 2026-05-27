@@ -9,6 +9,7 @@ import HistoryPage from '@/routes/HistoryPage'
 import SummaryDetailPage from '@/routes/SummaryDetailPage'
 import SettingsPage from '@/routes/SettingsPage'
 import ConnectGooglePage from '@/routes/ConnectGooglePage'
+import ConnectTodoistPage from '@/routes/ConnectTodoistPage'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
 export default function App() {
@@ -79,6 +80,22 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ConnectGooglePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/connect-todoist"
+          element={
+            <ProtectedRoute>
+              <ConnectTodoistPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/connect-todoist/callback"
+          element={
+            <ProtectedRoute>
+              <ConnectTodoistPage />
             </ProtectedRoute>
           }
         />

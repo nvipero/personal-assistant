@@ -18,6 +18,7 @@ import { useUserStore } from '@/stores/userStore'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { useUserMemory, useAddMemory, useUpdateMemory, useDeleteMemory } from '@/hooks/useUserMemory'
 import { useProfileMemory, useSaveProfile } from '@/hooks/useProfileMemory'
+import { useTodoistStatus } from '@/hooks/useTodoistStatus'
 import { useCostStats } from '@/hooks/useCostStats'
 import { callEdgeFunction } from '@/lib/api'
 import { formatCostEur } from '@/lib/format'
@@ -155,6 +156,10 @@ export default function SettingsPage() {
       },
     })
   }
+
+  const { data: todoistStatus } = useTodoistStatus(user?.id)
+  const todoistConnected = !!(todoistStatus?.connected_at && !todoistStatus?.revoked_at)
+  const todoistRevoked = !!(todoistStatus?.revoked_at)
 
   const googleConnected = !!settings?.google_email
   const showIosHint = isPushSupported() && !isRunningAsStandalone()
@@ -365,6 +370,31 @@ export default function SettingsPage() {
               <Button asChild variant="outline" size="sm" className="shrink-0">
                 <Link to="/connect-google">
                   {googleConnected ? fi.settings.reconnectGoogle : fi.settings.connectGoogle}
+                </Link>
+              </Button>
+            </div>
+            <Separator className="my-3" />
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 min-w-0">
+                {todoistConnected ? (
+                  <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{fi.settings.todoistConnection}</div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {todoistConnected
+                      ? fi.todoist.connected
+                      : todoistRevoked
+                        ? fi.todoist.revoked
+                        : fi.todoist.disconnected}
+                  </div>
+                </div>
+              </div>
+              <Button asChild variant="outline" size="sm" className="shrink-0">
+                <Link to="/connect-todoist">
+                  {todoistConnected ? fi.todoist.reconnect : fi.todoist.connect}
                 </Link>
               </Button>
             </div>
