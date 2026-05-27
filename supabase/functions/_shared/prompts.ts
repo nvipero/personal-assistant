@@ -124,20 +124,16 @@ export function buildWeatherBlock(w: WeatherForecast): string {
   return lines.join('\n')
 }
 
-export function buildPollenBlock(pollen: PollenData, include: boolean, antihistamine: boolean): string {
-  const levelStr = (n: number) => ['ei', 'vähän', 'kohtalaisesti', 'runsaasti'][n] ?? 'ei'
-
+export function buildPollenBlock(pollen: PollenData): string {
   const lines = [
-    `[SIITEPÖLY — Helsinki]`,
-    `Nyt: koivu ${levelStr(pollen.today.K)}, heinät ${levelStr(pollen.today.H)}`,
-    `Ennuste ${pollen.forecast.range}: koivu ${levelStr(pollen.forecast.K)}, heinät ${levelStr(pollen.forecast.H)}`,
-    `Antihistamiinimuistutus tarpeen: ${antihistamine ? 'kyllä' : 'ei'}`,
+    `SIITEPÖLY (Helsinki, tiedote ${pollen.bulletinDate}):`,
+    `- Nyt: koivu ${pollen.today.K}/3, heinät ${pollen.today.H}/3`,
+    `- Ennuste ${pollen.forecast.range}: koivu ${pollen.forecast.K}/3, heinät ${pollen.forecast.H}/3`,
+    `- Antihistamiinimuistutus tarpeen: ${pollen.antihistamine_reminder}`,
   ]
   if (pollen.forecast_text) {
-    lines.push(`Ennusteen vapaa teksti: """${pollen.forecast_text}"""`)
+    lines.push(`- Ennusteen vapaa teksti:\n"""\n${pollen.forecast_text}\n"""`)
   }
-  lines.push('')
-  lines.push('Kirjoita 1–3 lauseen kappale. Jos antihistamiinimuistutus on kyllä, mainitse lääke luontevasti. Jos vapaassa tekstissä mainitaan koivun kukinnan alkaminen Etelä-Suomessa lähipäivinä, nosta se esiin. Älä keksi mitään mitä datassa ei ole.')
   return lines.join('\n')
 }
 

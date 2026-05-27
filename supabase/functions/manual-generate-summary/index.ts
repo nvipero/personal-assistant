@@ -123,16 +123,7 @@ Deno.serve(async (req: Request) => {
 
     const weatherBlock = weatherForecast ? buildWeatherBlock(weatherForecast) : null
 
-    let pollenBlock: string | null = null
-    if (pollenData) {
-      const include = pollenData.today.K >= 2 || pollenData.today.H >= 2
-        || pollenData.forecast.K >= 2 || pollenData.forecast.H >= 2
-      const antihistamine = pollenData.today.K >= 2 || pollenData.today.H >= 2
-        || pollenData.forecast.K >= 2 || pollenData.forecast.H >= 2
-      if (include) {
-        pollenBlock = buildPollenBlock(pollenData, include, antihistamine)
-      }
-    }
+    const pollenBlock = pollenData ? buildPollenBlock(pollenData) : null
 
     const userPrompt = buildUserPrompt({
       userFirstName: capitalizedName,
