@@ -1,0 +1,36 @@
+export const weatherSymbols: Record<number, string> = {
+  1: 'selkeää',
+  2: 'puolipilvistä',
+  3: 'pilvistä',
+  21: 'heikkoja sadekuuroja',
+  22: 'sadekuuroja',
+  23: 'voimakkaita sadekuuroja',
+  24: 'ukkoskuuroja',
+  31: 'tihkusadetta',
+  32: 'heikkoa vesisadetta',
+  33: 'vesisadetta',
+  34: 'voimakasta vesisadetta',
+  35: 'ukkosta',
+  41: 'heikkoja lumikuuroja',
+  42: 'lumikuuroja',
+  43: 'voimakkaita lumikuuroja',
+  44: 'ukkoslumikuuroja',
+  51: 'heikkoa lumisadetta',
+  52: 'lumisadetta',
+  53: 'voimakasta lumisadetta',
+  54: 'ukkoslumisadetta',
+  61: 'jäätävää tihkusadetta',
+  62: 'jäätävää vesisadetta',
+  71: 'heikkoja räntäkuuroja',
+  72: 'räntäkuuroja',
+  73: 'voimakkaita räntäkuuroja',
+  81: 'heikkoa räntäsadetta',
+  82: 'räntäsadetta',
+  83: 'voimakasta räntäsadetta',
+  91: 'utua',
+  92: 'sumua',
+}
+
+export function describeSymbol(code: number): string {
+  return weatherSymbols[code] ?? 'tuntematon'
+}

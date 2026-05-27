@@ -15,6 +15,8 @@ export interface Database {
           push_enabled: boolean
           needs_google_reauth: boolean
           google_email: string | null
+          weather_enabled: boolean
+          weather_place: string
           created_at: string
           updated_at: string
         }
@@ -25,6 +27,8 @@ export interface Database {
           push_enabled?: boolean
           needs_google_reauth?: boolean
           google_email?: string | null
+          weather_enabled?: boolean
+          weather_place?: string
           created_at?: string
           updated_at?: string
         }
@@ -34,6 +38,8 @@ export interface Database {
           push_enabled?: boolean
           needs_google_reauth?: boolean
           google_email?: string | null
+          weather_enabled?: boolean
+          weather_place?: string
           updated_at?: string
         }
         Relationships: []

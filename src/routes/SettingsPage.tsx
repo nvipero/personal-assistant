@@ -99,6 +99,15 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleWeatherToggle(enable: boolean) {
+    if (!user) return
+    await supabase
+      .from('user_settings')
+      .update({ weather_enabled: enable })
+      .eq('user_id', user.id)
+    refetchSettings()
+  }
+
   async function handlePushToggle(enable: boolean) {
     setPushLoading(true)
     setPushError(null)
@@ -192,6 +201,19 @@ export default function SettingsPage() {
             >
               {generating ? fi.settings.generating : fi.settings.generateNow}
             </Button>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="weather-toggle" className="text-sm cursor-pointer">
+                  {fi.settings.weatherEnabled}
+                </Label>
+                <p className="text-xs text-muted-foreground">{fi.settings.weatherEnabledDescription}</p>
+              </div>
+              <Switch
+                id="weather-toggle"
+                checked={settings?.weather_enabled ?? true}
+                onCheckedChange={handleWeatherToggle}
+              />
+            </div>
           </CardContent>
         </Card>
 

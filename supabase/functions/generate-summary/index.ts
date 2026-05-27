@@ -2,11 +2,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { refreshAccessToken } from '../_shared/google.ts'
 import { decryptToken } from '../_shared/crypto.ts'
 import { generateSummary } from '../_shared/anthropic.ts'
-import { fetchActiveSystemPrompt, fetchFewShotExamples, buildUserPrompt, parseSummaryResponse } from '../_shared/prompts.ts'
+import { fetchActiveSystemPrompt, fetchFewShotExamples, buildUserPrompt, buildWeatherBlock, parseSummaryResponse } from '../_shared/prompts.ts'
 import { fetchUserMemories, formatMemoriesForPrompt } from '../_shared/memory.ts'
 import { getSpecialDay } from '../_shared/holidays.ts'
 import { googleCalendarConnector } from '../_shared/connectors/google-calendar.ts'
 import { gmailConnector } from '../_shared/connectors/gmail.ts'
+import { fetchWeather } from '../_shared/connectors/weather.ts'
 import { sendPushNotification } from '../_shared/push.ts'
 import { toZonedTime } from 'https://esm.sh/date-fns-tz@3'
 
@@ -96,10 +97,14 @@ Deno.serve(async (req: Request) => {
       accessToken,
     }
 
-    // Hae kalenteri- ja sähköpostidatan rinnakkain
-    const [calendarOutput, gmailOutput] = await Promise.all([
+    const summaryDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+    const [calendarOutput, gmailOutput, weatherForecast] = await Promise.all([
       googleCalendarConnector.fetch(connectorCtx as Parameters<typeof googleCalendarConnector.fetch>[0]),
       gmailConnector.fetch(connectorCtx as Parameters<typeof gmailConnector.fetch>[0]),
+      settings.weather_enabled
+        ? fetchWeather({ place: settings.weather_place ?? 'helsinki', date: summaryDate, timezone: settings.timezone })
+        : Promise.resolve(null),
     ])
 
     // Hae system-prompt ja few-shot esimerkit
@@ -119,6 +124,8 @@ Deno.serve(async (req: Request) => {
     const userFirstName = tokenRow.google_email.split('@')[0].split('.')[0]
     const capitalizedName = userFirstName.charAt(0).toUpperCase() + userFirstName.slice(1)
 
+    const weatherBlock = weatherForecast ? buildWeatherBlock(weatherForecast) : null
+
     const userPrompt = buildUserPrompt({
       userFirstName: capitalizedName,
       userEmail: tokenRow.google_email,
@@ -127,7 +134,7 @@ Deno.serve(async (req: Request) => {
       events: calendarOutput.items,
       emails: gmailOutput.items,
       specialDay: specialDay ?? undefined,
-    })
+    }) + (weatherBlock ? `\n\n${weatherBlock}` : '')
 
     // LLM-kutsu
     const allMessages = [
@@ -138,8 +145,6 @@ Deno.serve(async (req: Request) => {
     const llmResult = await generateSummary(systemPrompt, allMessages)
     const { summaryText, referencedEmailIds, referencedEventIds } = parseSummaryResponse(llmResult.text)
 
-    // Tallenna yhteenveto
-    const summaryDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
     const { data: saved, error: saveError } = await adminClient
       .from('daily_summaries')
       .insert({

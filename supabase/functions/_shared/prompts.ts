@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import type { SummaryContext, ParsedSummaryResponse } from './types.ts'
+import type { WeatherForecast } from './connectors/weather.ts'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -100,6 +101,25 @@ export function buildUserPrompt(ctx: SummaryContext): string {
   lines.push('')
   lines.push('Generoi aamuyhteenveto yllä olevien ohjeiden mukaisesti.')
 
+  return lines.join('\n')
+}
+
+export function buildWeatherBlock(w: WeatherForecast): string {
+  const lines = [
+    `[SÄÄTIEDOT — ${w.place.charAt(0).toUpperCase() + w.place.slice(1)}, ${w.date}]`,
+  ]
+  if (w.tempAt09 !== null) lines.push(`Aamulla klo 9: ${Math.round(w.tempAt09)} °C`)
+  if (w.tempAt17 !== null) lines.push(`Iltapäivällä klo 17: ${Math.round(w.tempAt17)} °C`)
+  lines.push(`Päivän korkein: ${Math.round(w.tempMax)} °C`)
+  lines.push(`Päivän matalin: ${Math.round(w.tempMin)} °C`)
+  if (w.precipitationHours.length > 0) {
+    const rainStr = w.precipitationHours.map(p => `klo ${p.hour}: ${p.mm.toFixed(1)} mm/h`).join(', ')
+    lines.push(`Sade: ${rainStr}`)
+  } else {
+    lines.push('Sade: ei sateita')
+  }
+  if (w.maxWindMs !== null) lines.push(`Tuuli: ${Math.round(w.maxWindMs)} m/s`)
+  if (w.symbol) lines.push(`Yleiskuva keskipäivällä: ${w.symbol.description}`)
   return lines.join('\n')
 }
 
