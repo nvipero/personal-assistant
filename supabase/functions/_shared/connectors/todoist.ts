@@ -43,8 +43,8 @@ export async function fetchTodoistTasks(
     const headers = { Authorization: `Bearer ${token}` }
 
     const [tasksRes, projectsRes] = await Promise.all([
-      fetch('https://api.todoist.com/api/v1/tasks', { headers }),
-      fetch('https://api.todoist.com/api/v1/projects', { headers }),
+      fetch('https://api.todoist.com/rest/v2/tasks', { headers }),
+      fetch('https://api.todoist.com/rest/v2/projects', { headers }),
     ])
 
     if (tasksRes.status === 401) {
