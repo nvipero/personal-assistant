@@ -14,7 +14,7 @@ import { fetchWeather } from '../_shared/connectors/weather.ts'
 import { fetchPollenForDate } from '../_shared/connectors/pollen.ts'
 import { fetchTodoistTasks } from '../_shared/connectors/todoist.ts'
 import { sendPushNotification } from '../_shared/push.ts'
-import { toZonedTime } from 'https://esm.sh/date-fns-tz@3'
+import { formatInTimeZone } from 'https://esm.sh/date-fns-tz@3'
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
@@ -83,9 +83,9 @@ Deno.serve(async (req: Request) => {
     const refreshToken = await decryptToken(tokenRow.encrypted_refresh_token as unknown as Uint8Array)
     const accessToken = await refreshAccessToken(refreshToken)
 
-    const now = new Date()
-    const zonedNow = toZonedTime(now, settings.timezone)
-    const today = new Date(zonedNow.getFullYear(), zonedNow.getMonth(), zonedNow.getDate())
+    const summaryDate = formatInTimeZone(new Date(), settings.timezone, 'yyyy-MM-dd')
+    const [tyear, tmonth, tday] = summaryDate.split('-').map(Number)
+    const today = new Date(tyear, tmonth - 1, tday)
 
     const connectorCtx = {
       userId,
@@ -94,8 +94,6 @@ Deno.serve(async (req: Request) => {
       userEmail: tokenRow.google_email,
       accessToken,
     }
-
-    const summaryDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
     const month = today.getMonth() + 1
     const isPollenSeason = month >= 3 && month <= 9
