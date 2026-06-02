@@ -155,7 +155,7 @@ Aktiivinen versio: **v4** (viimeisin).
 
 **Siitepöly** — Tuotannossa. `fetch-pollen`-funktio hakee ennustteen sptied.fi:stä cron-ajona klo 03:30 UTC ja tallentaa `pollen_bulletin`-tauluun. `pollen.ts`-connector lukee cachesta. Kausi on maaliskuu–syyskuu, muulloin connector palauttaa `null`.
 
-**Todoist** — Tuotannossa. Hakee tehtävät REST v2 -rajapinnasta, luokittelee ne (tänään / myöhässä / tulossa 7 vrk, prioriteetti ≥3). Tunnistaa revokoidun tokenin (401) ja merkitsee integraation epäaktiiviseksi.
+**Todoist** — Tuotannossa. Hakee tehtävät `api/v1`-rajapinnasta paginoituna (`{ results, next_cursor }`), luokittelee ne (tänään / myöhässä / tulossa 7 vrk, prioriteetti ≥3). Tunnistaa revokoidun tokenin (401) ja merkitsee integraation epäaktiiviseksi.
 
 ---
 

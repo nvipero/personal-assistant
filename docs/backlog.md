@@ -83,12 +83,6 @@ Jokaisesta backlog-kohdasta:
 - **Miksi ulkona:** Todoist ei tue aikaestimaatteja natiivisti. LLM tekee karkean arvion sisällöstä, mikä riittää useimmiten.
 - **Mihin liittyy:** Aktivoituu jos LLM:n karkea arvio osoittautuu järjestelmällisesti epäluotettavaksi käyttöpalautteen perusteella.
 
-### 11. Aikavyöhykkeen käyttäjäkohtainen käsittely
-
-- **Mitä:** "Tänään" lasketaan aina käyttäjäprofiilin aikavyöhykkeessä — myös cron-kutsuissa. Tällä hetkellä `user_settings.timezone` on olemassa, mutta käytäntö koodissa kannattaa varmistaa kun käyttäjäkunta laajenee tai matkustaa.
-- **Miksi ulkona:** Käyttäjäkunta on Suomessa, käytännön ongelmaa ei ole tullut.
-- **Mihin liittyy:** Kun ensimmäinen käyttäjä matkustaa ulkomaille ja huomaa yhteenvedon ajoittuvan väärin, tai jos käyttäjäkuntaa laajennetaan toiselle aikavyöhykkeelle. Hyvä tarkistaa myös aina kun cron-aikataulutusta säädetään.
-
 ### 12. Uudet tietolähteet (uutiset, jne.)
 
 - **Mitä:** Uusia connectoreita aamuyhteenvetoon — uutiset on aiemmin mainittu kandidaattina, muita voi tulla.
