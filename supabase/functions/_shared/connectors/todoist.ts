@@ -129,7 +129,8 @@ export async function fetchTodoistTasks(
     })
 
     return { today: todayTasks, overdue: overdueTasks, upcoming: upcomingTasks, projectNames }
-  } catch {
+  } catch (err) {
+    console.error('fetchTodoistTasks error:', err)
     return null
   }
 }

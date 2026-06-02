@@ -159,6 +159,7 @@ Deno.serve(async (req: Request) => {
         input_tokens: llmResult.inputTokens,
         output_tokens: llmResult.outputTokens,
         model: llmResult.model,
+        generated_at: new Date().toISOString(),
       }, { onConflict: 'user_id,summary_date' })
       .select('id')
       .single()
