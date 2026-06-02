@@ -1,7 +1,6 @@
 import { getCalendarList, getCalendarEvents } from '../google.ts'
 import type { Connector, ConnectorContext, ConnectorOutput, ConnectorItem } from '../types.ts'
-import { format } from 'https://esm.sh/date-fns@3'
-import { toZonedTime, formatInTimeZone } from 'https://esm.sh/date-fns-tz@3'
+import { formatInTimeZone } from 'https://esm.sh/date-fns-tz@3'
 
 function formatEventTime(dateTimeStr: string | undefined, dateStr: string | undefined, timezone: string): string {
   if (dateTimeStr) {
@@ -31,10 +30,10 @@ export const googleCalendarConnector: Connector = {
   },
 
   async fetch(ctx: ConnectorContext & { accessToken: string }): Promise<ConnectorOutput> {
-    const localDate = toZonedTime(ctx.date, ctx.timezone)
-    const dateStr = format(localDate, 'yyyy-MM-dd')
-    const timeMin = `${dateStr}T00:00:00`
-    const timeMax = `${dateStr}T23:59:59`
+    const dateStr = formatInTimeZone(ctx.date, ctx.timezone, 'yyyy-MM-dd')
+    const tzOffset = formatInTimeZone(new Date(`${dateStr}T12:00:00Z`), ctx.timezone, 'xxx')
+    const timeMin = `${dateStr}T00:00:00${tzOffset}`
+    const timeMax = `${dateStr}T23:59:59${tzOffset}`
 
     const calendars = await getCalendarList((ctx as unknown as { accessToken: string }).accessToken)
     const allEvents = (
