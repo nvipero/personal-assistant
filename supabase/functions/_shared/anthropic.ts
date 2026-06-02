@@ -1,5 +1,5 @@
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!
-const MODEL = 'claude-haiku-4-5'
+const DEFAULT_MODEL = 'claude-haiku-4-5'
 
 interface AnthropicMessage {
   role: 'user' | 'assistant'
@@ -15,7 +15,8 @@ interface AnthropicResponse {
 
 export async function generateSummary(
   systemPrompt: string,
-  messages: AnthropicMessage[]
+  messages: AnthropicMessage[],
+  model = DEFAULT_MODEL
 ): Promise<{ text: string; inputTokens: number; outputTokens: number; model: string }> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -25,7 +26,7 @@ export async function generateSummary(
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: 800,
       temperature: 0.7,
       system: systemPrompt,
@@ -45,7 +46,7 @@ export async function generateSummary(
     text,
     inputTokens: json.usage.input_tokens,
     outputTokens: json.usage.output_tokens,
-    model: json.model ?? MODEL,
+    model: json.model ?? model,
   }
 }
 
@@ -76,7 +77,7 @@ YHTEENVEDON KONTEKSTI: ${summaryContext}`
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: DEFAULT_MODEL,
       max_tokens: 200,
       temperature: 0.3,
       system: systemPrompt,

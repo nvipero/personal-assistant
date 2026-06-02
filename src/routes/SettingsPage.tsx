@@ -109,6 +109,15 @@ export default function SettingsPage() {
     refetchSettings()
   }
 
+  async function handleModelChange(model: string) {
+    if (!user) return
+    await supabase
+      .from('user_settings')
+      .update({ summary_model: model })
+      .eq('user_id', user.id)
+    refetchSettings()
+  }
+
   async function handlePushToggle(enable: boolean) {
     setPushLoading(true)
     setPushError(null)
@@ -218,6 +227,21 @@ export default function SettingsPage() {
                 checked={settings?.weather_enabled ?? true}
                 onCheckedChange={handleWeatherToggle}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Tekoälymalli</Label>
+              <Select
+                value={settings?.summary_model ?? 'claude-haiku-4-5'}
+                onValueChange={handleModelChange}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="claude-haiku-4-5">Haiku 4.5 — nopeampi, edullisempi</SelectItem>
+                  <SelectItem value="claude-sonnet-4-6">Sonnet 4.6 — tarkempi, kalliimpi</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>

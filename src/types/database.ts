@@ -17,6 +17,7 @@ export interface Database {
           google_email: string | null
           weather_enabled: boolean
           weather_place: string
+          summary_model: string
           created_at: string
           updated_at: string
         }
@@ -29,6 +30,7 @@ export interface Database {
           google_email?: string | null
           weather_enabled?: boolean
           weather_place?: string
+          summary_model?: string
           created_at?: string
           updated_at?: string
         }
@@ -40,6 +42,7 @@ export interface Database {
           google_email?: string | null
           weather_enabled?: boolean
           weather_place?: string
+          summary_model?: string
           updated_at?: string
         }
         Relationships: []

@@ -154,7 +154,7 @@ Deno.serve(async (req: Request) => {
       { role: 'user' as const, content: userPrompt },
     ]
 
-    const llmResult = await generateSummary(systemPrompt, allMessages)
+    const llmResult = await generateSummary(systemPrompt, allMessages, settings.summary_model ?? undefined)
     const { summaryText, referencedEmailIds, referencedEventIds } = parseSummaryResponse(llmResult.text)
 
     const { data: saved, error: saveError } = await adminClient
