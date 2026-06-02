@@ -21,6 +21,29 @@ export type TodoistData = {
   projectNames: Record<string, string>
 }
 
+type PagedResponse<T> = { results: T[]; next_cursor?: string }
+
+// api/v1 returns paginated { results, next_cursor } — fetch all pages
+async function fetchAllPages<T>(url: string, headers: Record<string, string>): Promise<{ status: number; items: T[] }> {
+  const items: T[] = []
+
+  const firstRes = await fetch(url, { headers })
+  const status = firstRes.status
+  if (!firstRes.ok) return { status, items }
+
+  let page = await firstRes.json() as PagedResponse<T>
+  items.push(...page.results)
+
+  while (page.next_cursor) {
+    const res = await fetch(`${url}?cursor=${encodeURIComponent(page.next_cursor)}`, { headers })
+    if (!res.ok) break
+    page = await res.json() as PagedResponse<T>
+    items.push(...page.results)
+  }
+
+  return { status, items }
+}
+
 export async function fetchTodoistTasks(
   userId: string,
   timezone: string,
@@ -39,29 +62,26 @@ export async function fetchTodoistTasks(
     if (!integration || integration.revoked_at) return null
 
     const token = await decryptToken(integration.access_token as unknown as Uint8Array)
-
     const headers = { Authorization: `Bearer ${token}` }
 
-    const [tasksRes, projectsRes] = await Promise.all([
-      fetch('https://api.todoist.com/rest/v2/tasks', { headers }),
-      fetch('https://api.todoist.com/rest/v2/projects', { headers }),
-    ])
+    const { status: tasksStatus, items: tasks } = await fetchAllPages<TodoistTask>(
+      'https://api.todoist.com/api/v1/tasks', headers
+    )
 
-    if (tasksRes.status === 401) {
+    if (tasksStatus === 401) {
       await client.from('user_integrations')
         .update({ revoked_at: new Date().toISOString() })
         .eq('user_id', userId).eq('provider', 'todoist')
       return null
     }
 
-    if (!tasksRes.ok) return null
+    if (tasksStatus !== 200) return null
 
-    const tasks = await tasksRes.json() as TodoistTask[]
     const projectNames: Record<string, string> = {}
-    if (projectsRes.ok) {
-      const projects = await projectsRes.json() as Array<{ id: string; name: string }>
-      for (const p of projects) projectNames[p.id] = p.name
-    }
+    const { items: projectsList } = await fetchAllPages<{ id: string; name: string }>(
+      'https://api.todoist.com/api/v1/projects', headers
+    )
+    for (const p of projectsList) projectNames[p.id] = p.name
 
     await client.from('user_integrations')
       .update({ last_used_at: new Date().toISOString() })
