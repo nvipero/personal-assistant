@@ -10,7 +10,7 @@ const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const FI_WEEKDAYS = ['sunnuntai', 'maanantai', 'tiistai', 'keskiviikko', 'torstai', 'perjantai', 'lauantai']
 const FI_WEEKDAYS_CAP = ['Sunnuntai', 'Maanantai', 'Tiistai', 'Keskiviikko', 'Torstai', 'Perjantai', 'Lauantai']
 
-function formatDate(date: Date): string {
+export function formatDate(date: Date): string {
   const d = date.getDate()
   const m = date.getMonth() + 1
   const yyyy = date.getFullYear()
@@ -18,11 +18,11 @@ function formatDate(date: Date): string {
   return `${weekday} ${d}.${m}.${yyyy}`
 }
 
-export async function fetchActiveSystemPrompt(): Promise<string> {
+export async function fetchActiveSystemPrompt(): Promise<{ id: string; content: string }> {
   const adminClient = createClient(supabaseUrl, serviceRoleKey)
   const { data, error } = await adminClient
     .from('prompt_versions')
-    .select('content')
+    .select('id, content')
     .eq('name', 'daily_summary_system')
     .eq('is_active', true)
     .order('version', { ascending: false })
@@ -31,7 +31,7 @@ export async function fetchActiveSystemPrompt(): Promise<string> {
 
   if (error) throw new Error(`System-promptin haku epäonnistui: ${error.message}`)
   if (!data) throw new Error('Aktiivista system-promptia ei löydy')
-  return data.content as string
+  return { id: data.id as string, content: data.content as string }
 }
 
 export async function fetchFewShotExamples(): Promise<Array<{ role: 'user' | 'assistant'; content: string }>> {

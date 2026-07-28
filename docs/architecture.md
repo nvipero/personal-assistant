@@ -81,12 +81,15 @@ Skeema rakennetaan ainoastaan migraatioista (`supabase/migrations/`), ei erillis
 | `google_oauth_tokens` | Salattu Google refresh token, vain service_role |
 | `user_integrations` | Muut OAuth-providerit (alkaen Todoistista), salattuna |
 | `oauth_states` | Lyhytikäiset OAuth-tilaparametrit CSRF-suojaa varten |
-| `daily_summaries` | Generoidut yhteenvedot tekstinä, tokenimäärät, viittaukset alkuperäiseen dataan (email/event ID:t) |
+| `daily_summaries` | Generoidut yhteenvedot tekstinä, tokenimäärät, `generated_by` (`llm` \| `template`), viittaukset alkuperäiseen dataan (email/event ID:t) |
 | `summary_feedback` | Käyttäjän antama palaute yhteenvedosta + LLM-generoidut muistiehdotukset |
 | `user_memory` | Käyttäjäkohtainen muistirakenne kategorioissa: people, preferences, context, feedback |
 | `push_subscriptions` | Selainkohtaiset Web Push -tilaukset |
-| `prompt_versions` | Promptin versiohistoria (sisältö, malli, max_tokens, temperature), vain service_role |
+| `prompt_versions` | Promptin versiohistoria (nimi, versio, sisältö, is_active), vain service_role. **Ei** malli-/parametrisarakkeita — malli tulee `user_settings.summary_model`:sta |
+| `llm_usage` | Per-kutsu token-käyttö ja arvioitu hinta (input/output/cache-tokenit, `estimated_cost_usd`, `status`, `run_id`), vain service_role |
 | `pollen_bulletin` | Siitepölyennustecache (haetaan kerran päivässä cronilla) |
+
+`user_settings` sisältää lisäksi `summary_model` (per-käyttäjä mallinvalinta) ja `is_admin` (fallback-hälytyksen kohdistus).
 
 Kaikilla tauluilla on RLS päällä. Service_role -taulut eivät ole RLS:n läpi luettavissa edes omistajalle — niitä käsitellään vain Edge Functioneista.
 
@@ -107,9 +110,12 @@ Kaikilla tauluilla on RLS päällä. Service_role -taulut eivät ole RLS:n läpi
 | `todoist-oauth-callback` | Todoist OAuth code → access token, tallennus |
 | `push-subscribe` / `push-unsubscribe` | Push-tilauksen hallinta |
 
-Jaettu koodi on `supabase/functions/_shared/`-kansiossa: `google.ts`, `anthropic.ts`, `crypto.ts`, `push.ts`, `prompts.ts`, `memory.ts`, `holidays.ts`, `types.ts`, `connectors/`.
+Jaettu koodi on `supabase/functions/_shared/`-kansiossa: `google.ts`, `anthropic.ts`, `summary.ts`, `crypto.ts`, `push.ts`, `prompts.ts`, `memory.ts`, `holidays.ts`, `types.ts`, `connectors/`.
 
-**Cron-aikataulutus:** `0,30 3-7 * * *` UTC kattaa Suomen kesä- ja talviajan aamuajat. `generate-summary` tarkistaa itse onko käyttäjän ajankohta jo ohitettu eikä yhteenvetoa vielä luotu.
+- `anthropic.ts` — matala API-kerros: mallien allowlist + mallikohtaiset parametrit (`resolveModel`, `requestSummary`), muistiehdotukset.
+- `summary.ts` — aamuyhteenvedon orkestrointi: template-fallback, `llm_usage`-logitus + hinnasto, ylläpitäjän fallback-hälytys. Jaettu `generate-summary`- ja `manual-generate-summary`-funktioiden kesken.
+
+**Cron-aikataulutus:** `0,30 3-7 * * *` UTC kattaa Suomen kesä- ja talviajan aamuajat. `trigger_due_summaries` generoi yhden `run_id`:n per ajo ja välittää sen jokaisen käyttäjän `generate-summary`-kutsun bodyssä (→ "yhden aamun kustannus" on yksi `group by run_id` -kysely). `generate-summary` tarkistaa itse onko käyttäjän ajankohta jo ohitettu eikä yhteenvetoa vielä luotu.
 
 ---
 
@@ -160,13 +166,13 @@ Sukupolvi B kutsutaan suoraan `generate-summary`:stä erillisinä awaiteina. Tä
 
 ## 9. Promptien hallinta
 
-`prompt_versions`-taulu pitää promptin sisällön, mallin, max_tokens-arvon ja temperaturen kannassa. Partial unique index + trigger varmistaa että yhdellä prompt-nimellä on aina täsmälleen yksi aktiivinen versio.
+`prompt_versions`-taulu pitää promptin **sisällön** kannassa (nimi, versio, is_active). Partial unique index + trigger varmistaa että yhdellä prompt-nimellä on aina täsmälleen yksi aktiivinen versio. Taulussa **ei** ole malli-/parametrisarakkeita — malli valitaan erikseen `user_settings.summary_model`:sta.
 
 **Nykyiset promptit:**
 - `daily_summary_system` — neljä versiota (v1 perusta, v2 sää, v3 siitepöly, v4 Todoist). Aktiivinen: v4.
 - `feedback_to_memory` — muistiehdotusten generointi palautteesta.
 
-**Tunnettu poikkeama:** `prompt_versions.model`-sarake ei tällä hetkellä ohjaa mallinvalintaa — käytetty malli on kovakoodattu `_shared/anthropic.ts`:ssä (`claude-haiku-4-5`). Mallinvaihto edellyttää tällä hetkellä koodimuutosta. Kts. `backlog.md`.
+**Mallinvalinta:** kts. §13.
 
 ---
 
@@ -208,8 +214,21 @@ Muistin täyttämiseen on suunniteltu kolme polkua:
 
 ## 13. Modelin ja prompttien vaihto
 
-Tällä hetkellä:
-- **Promptien sisältö** voidaan vaihtaa SQL-päivityksellä (`prompt_versions`-tauluun uusi versio aktiiviseksi).
-- **Mallin vaihto** edellyttää koodimuutosta `_shared/anthropic.ts`:ssä. Backlogissa tehtävä jolla tämä siirretään `prompt_versions.model`-sarakkeen ohjaamaksi.
+- **Promptien sisältö** vaihdetaan SQL-päivityksellä (`prompt_versions`-tauluun uusi versio aktiiviseksi).
+- **Mallin vaihto** tapahtuu `user_settings.summary_model`:a muuttamalla (per-käyttäjä; SettingsPagen dropdown tai suora SQL). Ei deployta.
+
+**Allowlist (`_shared/anthropic.ts`):** `summary_model`-arvo validoidaan eksplisiittistä allowlistia vasten. Tuntematon / null / tyhjä arvo → oletus `claude-haiku-4-5-20251001` + `console.warn` (ei kaadeta). Hyväksytyt arvot ja niiden pinnatut API-ID:t:
+
+| `summary_model` | API-malli | Parametrit |
+|---|---|---|
+| `claude-haiku-4-5` / `claude-haiku-4-5-20251001` (oletus) | `claude-haiku-4-5-20251001` | `temperature: 0.7`, max_tokens 1024 |
+| `claude-sonnet-4-6` | `claude-sonnet-4-6` | `effort: low`, ei temperaturea, max_tokens 2048 |
+| `claude-sonnet-5` | `claude-sonnet-5` | `effort: low`, ei temperaturea, max_tokens 2048 |
+
+**Mallikohtaiset parametrit — miksi:** Sonnet 5 hylkää ei-default samplausparametrit (`temperature`/`top_p`/`top_k`) 400-virheellä, joten temperature jätetään pois Sonnet-malleilta. `effort: low` pitää lyhyen generointitehtävän halpana (Sonnet 5:llä adaptive thinking on oletuksena päällä). Haiku 4.5 ei tue effort- eikä adaptive-thinking-parametreja, joten niitä ei aseteta sille.
+
+**Fallback ja logitus:** jokainen LLM-kutsu kirjoittaa `llm_usage`-rivin (tokenit + arvioitu hinta Helsinki-ajan hinnaston mukaan). Jos LLM-kutsu epäonnistuu mistä tahansa syystä, `generateSummaryOrTemplate` palaa deterministiseen templateen (`generated_by = 'template'`), kirjaa `status = 'fallback'` ja lähettää Web Push -hälytyksen vain ylläpitäjälle (`is_admin = true`). Raportti toimitetaan aina.
+
+> **ID-varmistus:** allowlistin ID:t on todennettu Anthropicin mallikatalogia vasten. Halutessa ne voi varmistaa ajonaikaisesti kertaluontoisesti: `curl https://api.anthropic.com/v1/models -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01"` ja verrata allowlistiin. Tätä **ei** ole tuotantopolussa.
 
 Haiku 4.5 on todettu riittäväksi nykyisille käyttötapauksille. Sonnetiin siirtyminen on yhden koodimuutoksen päässä (jatkossa SQL-päivityksen päässä).

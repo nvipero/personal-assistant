@@ -1,23 +1,110 @@
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!
-const DEFAULT_MODEL = 'claude-haiku-4-5'
 
-interface AnthropicMessage {
+// Muistiehdotusten (feedback-to-memory) malli — pieni, edullinen Haiku.
+const MEMORY_MODEL = 'claude-haiku-4-5-20251001'
+
+export interface AnthropicMessage {
   role: 'user' | 'assistant'
   content: string
 }
 
 interface AnthropicResponse {
   content: Array<{ type: string; text: string }>
-  usage: { input_tokens: number; output_tokens: number }
+  usage: {
+    input_tokens: number
+    output_tokens: number
+    cache_creation_input_tokens?: number
+    cache_read_input_tokens?: number
+  }
   model: string
   stop_reason: string
 }
 
-export async function generateSummary(
+// ----------------------------------------------------------------------------
+// Osa 1: mallien allowlist ja mallikohtaiset parametrit
+// ----------------------------------------------------------------------------
+// Avain = user_settings.summary_model -arvo (mitä kannassa voi olla).
+// apiModel = eksplisiittinen, pinnattu ID joka lähtee API-kutsuun (ei aliaksia).
+// Tuntematon / null / tyhjä -> DEFAULT_MODEL_KEY + console.warn, ei poikkeusta:
+// raportin pitää syntyä joka tapauksessa.
+export interface ModelConfig {
+  apiModel: string
+  maxTokens: number
+  temperature?: number            // jätetään pois kokonaan jos undefined
+  thinking?: { type: 'disabled' }
+  effort?: 'low' | 'medium' | 'high'
+}
+
+export const DEFAULT_MODEL_KEY = 'claude-haiku-4-5-20251001'
+
+export const MODEL_ALLOWLIST: Record<string, ModelConfig> = {
+  // Oletus / nykyinen tuotantomalli. Haiku 4.5 ei tue adaptive thinkingiä eikä
+  // effort-parametria (effort palauttaa virheen), temperature on sallittu.
+  'claude-haiku-4-5-20251001': { apiModel: 'claude-haiku-4-5-20251001', maxTokens: 1024, temperature: 0.7 },
+  // Kannassa jo oleva alias (user_settings.summary_model oletusarvo) — hyväksytään
+  // ja ohjataan samaan pinnattuun ID:hen, jottei se putoa oletukseen turhaan.
+  'claude-haiku-4-5':          { apiModel: 'claude-haiku-4-5-20251001', maxTokens: 1024, temperature: 0.7 },
+  // Sonnet-mallit: EI temperaturea — Sonnet 5 hylkää ei-default samplausparametrit
+  // 400-virheellä. effort: 'low' + reilu max_tokens pitää lyhyen generointitehtävän
+  // halpana eikä anna (Sonnet 5:n oletuksena päällä olevan) adaptive thinkingin
+  // katkaista vastausta. thinking-parametria EI aseteta eksplisiittisesti.
+  'claude-sonnet-4-6':         { apiModel: 'claude-sonnet-4-6', maxTokens: 2048, effort: 'low' },
+  'claude-sonnet-5':           { apiModel: 'claude-sonnet-5', maxTokens: 2048, effort: 'low' },
+}
+
+export interface ResolvedModel {
+  config: ModelConfig
+  requestedKey: string
+  coerced: boolean
+  rejectedValue: string | null
+}
+
+export function resolveModel(requested?: string | null): ResolvedModel {
+  const key = requested?.trim()
+  if (key && MODEL_ALLOWLIST[key]) {
+    return { config: MODEL_ALLOWLIST[key], requestedKey: key, coerced: false, rejectedValue: null }
+  }
+  console.warn(
+    `[anthropic] Tuntematon tai puuttuva malli '${requested ?? '(null)'}' — käytetään oletusta ${DEFAULT_MODEL_KEY}`
+  )
+  return {
+    config: MODEL_ALLOWLIST[DEFAULT_MODEL_KEY],
+    requestedKey: DEFAULT_MODEL_KEY,
+    coerced: true,
+    rejectedValue: requested ?? null,
+  }
+}
+
+export interface AnthropicUsage {
+  inputTokens: number               // vain viimeisen cache breakpointin jälkeiset
+  outputTokens: number
+  cacheCreationInputTokens: number
+  cacheReadInputTokens: number
+}
+
+export interface GenerateSummaryResult {
+  text: string
+  model: string
+  usage: AnthropicUsage
+}
+
+// Matalan tason kutsu: heittää poikkeuksen kaikissa virhetilanteissa
+// (ei-2xx, tyhjä/epämuotoinen vastaus). Kutsuja vastaa fallbackista (osa 3).
+export async function requestSummary(
   systemPrompt: string,
   messages: AnthropicMessage[],
-  model = DEFAULT_MODEL
-): Promise<{ text: string; inputTokens: number; outputTokens: number; model: string }> {
+  config: ModelConfig
+): Promise<GenerateSummaryResult> {
+  const body: Record<string, unknown> = {
+    model: config.apiModel,
+    max_tokens: config.maxTokens,
+    system: systemPrompt,
+    messages,
+  }
+  if (config.temperature !== undefined) body.temperature = config.temperature
+  if (config.thinking) body.thinking = config.thinking
+  if (config.effort) body.output_config = { effort: config.effort }
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -25,28 +112,30 @@ export async function generateSummary(
       'x-api-key': ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: 800,
-      temperature: 0.7,
-      system: systemPrompt,
-      messages,
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`Anthropic API virhe: ${res.status} ${body}`)
+    const errBody = await res.text().catch(() => '')
+    throw new Error(`Anthropic API virhe: ${res.status} ${errBody}`)
   }
 
   const json = await res.json() as AnthropicResponse
-  const text = json.content.find(c => c.type === 'text')?.text ?? ''
+  const text = json.content?.find(c => c.type === 'text')?.text ?? ''
+  if (!text.trim()) {
+    throw new Error('Anthropic API palautti tyhjän tai epämuotoisen vastauksen')
+  }
 
+  const u = json.usage
   return {
     text,
-    inputTokens: json.usage.input_tokens,
-    outputTokens: json.usage.output_tokens,
-    model: json.model ?? model,
+    model: json.model ?? config.apiModel,
+    usage: {
+      inputTokens: u.input_tokens ?? 0,
+      outputTokens: u.output_tokens ?? 0,
+      cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
+    },
   }
 }
 
@@ -77,7 +166,7 @@ YHTEENVEDON KONTEKSTI: ${summaryContext}`
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: DEFAULT_MODEL,
+      model: MEMORY_MODEL,
       max_tokens: 200,
       temperature: 0.3,
       system: systemPrompt,

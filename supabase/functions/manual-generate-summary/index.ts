@@ -4,8 +4,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { refreshAccessToken } from '../_shared/google.ts'
 import { decryptToken } from '../_shared/crypto.ts'
-import { generateSummary } from '../_shared/anthropic.ts'
 import { fetchActiveSystemPrompt, fetchFewShotExamples, buildUserPrompt, buildWeatherBlock, buildPollenBlock, buildTodoistBlock, parseSummaryResponse } from '../_shared/prompts.ts'
+import { generateSummaryOrTemplate, buildTemplateSummary } from '../_shared/summary.ts'
 import { fetchUserMemories, formatMemoriesForPrompt } from '../_shared/memory.ts'
 import { getSpecialDay } from '../_shared/holidays.ts'
 import { googleCalendarConnector } from '../_shared/connectors/google-calendar.ts'
@@ -108,12 +108,14 @@ Deno.serve(async (req: Request) => {
       fetchTodoistTasks(userId, settings.timezone, summaryDate),
     ])
 
-    const [baseSystemPrompt, fewShotMessages, memories] = await Promise.all([
+    const [promptRow, fewShotMessages, memories] = await Promise.all([
       fetchActiveSystemPrompt(),
       fetchFewShotExamples(),
       fetchUserMemories(userId),
     ])
 
+    const baseSystemPrompt = promptRow.content
+    const promptVersionId = promptRow.id
     const memoryBlock = formatMemoriesForPrompt(memories)
     const systemPrompt = memoryBlock ? `${baseSystemPrompt}\n\n${memoryBlock}` : baseSystemPrompt
     const specialDay = getSpecialDay(today)
@@ -144,8 +146,28 @@ Deno.serve(async (req: Request) => {
       { role: 'user' as const, content: userPrompt },
     ]
 
-    const llmResult = await generateSummary(systemPrompt, allMessages, settings.summary_model ?? undefined)
-    const { summaryText, referencedEmailIds, referencedEventIds } = parseSummaryResponse(llmResult.text)
+    // LLM-kutsu template-fallbackilla (osa 3) + token-/kustannuslogitus (osa 2).
+    // run_id: manuaalisessa ajossa yksi kutsu = oma run_id.
+    const result = await generateSummaryOrTemplate({
+      adminClient,
+      functionName: 'manual-generate-summary',
+      userId,
+      runId: crypto.randomUUID(),
+      promptVersionId,
+      systemPrompt,
+      messages: allMessages,
+      modelKey: settings.summary_model,
+      buildTemplate: () => buildTemplateSummary({
+        name: capitalizedName,
+        date: today,
+        events: calendarOutput.items,
+        emails: gmailOutput.items,
+        weatherBlock,
+        pollenBlock,
+        todoistBlock,
+      }),
+    })
+    const { summaryText, referencedEmailIds, referencedEventIds } = parseSummaryResponse(result.text)
 
     // Upsert: jos tänään jo on yhteenveto, ylikirjoitetaan
     const { data: saved, error: saveError } = await adminClient
@@ -156,9 +178,10 @@ Deno.serve(async (req: Request) => {
         summary_text: summaryText,
         email_ids: referencedEmailIds,
         event_ids: referencedEventIds,
-        input_tokens: llmResult.inputTokens,
-        output_tokens: llmResult.outputTokens,
-        model: llmResult.model,
+        input_tokens: result.usage.inputTokens,
+        output_tokens: result.usage.outputTokens,
+        model: result.model,
+        generated_by: result.generatedBy,
         generated_at: new Date().toISOString(),
       }, { onConflict: 'user_id,summary_date' })
       .select('id')

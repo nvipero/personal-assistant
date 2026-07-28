@@ -18,6 +18,7 @@ export interface Database {
           weather_enabled: boolean
           weather_place: string
           summary_model: string
+          is_admin: boolean
           created_at: string
           updated_at: string
         }
@@ -31,6 +32,7 @@ export interface Database {
           weather_enabled?: boolean
           weather_place?: string
           summary_model?: string
+          is_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -43,6 +45,7 @@ export interface Database {
           weather_enabled?: boolean
           weather_place?: string
           summary_model?: string
+          is_admin?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -58,6 +61,7 @@ export interface Database {
           input_tokens: number
           output_tokens: number
           model: string
+          generated_by: string
           generated_at: string
         }
         Insert: {
@@ -70,6 +74,7 @@ export interface Database {
           input_tokens: number
           output_tokens: number
           model: string
+          generated_by?: string
           generated_at?: string
         }
         Update: {
@@ -79,6 +84,47 @@ export interface Database {
           input_tokens?: number
           output_tokens?: number
           model?: string
+          generated_by?: string
+        }
+        Relationships: []
+      }
+      llm_usage: {
+        Row: {
+          id: number
+          created_at: string
+          function_name: string
+          model: string
+          prompt_version_id: string | null
+          user_id: string | null
+          run_id: string | null
+          input_tokens: number
+          output_tokens: number
+          cache_creation_input_tokens: number
+          cache_read_input_tokens: number
+          estimated_cost_usd: number | null
+          status: string
+          error_message: string | null
+        }
+        Insert: {
+          id?: number
+          created_at?: string
+          function_name: string
+          model: string
+          prompt_version_id?: string | null
+          user_id?: string | null
+          run_id?: string | null
+          input_tokens?: number
+          output_tokens?: number
+          cache_creation_input_tokens?: number
+          cache_read_input_tokens?: number
+          estimated_cost_usd?: number | null
+          status: string
+          error_message?: string | null
+        }
+        Update: {
+          status?: string
+          error_message?: string | null
+          estimated_cost_usd?: number | null
         }
         Relationships: []
       }

@@ -25,11 +25,17 @@ Jokaisesta backlog-kohdasta:
 - **Miksi ulkona:** Connectorit on lisätty iteratiivisesti, ja jokaisella kerralla on edetty nopeasti toiminnallisuus edellä.
 - **Mihin liittyy:** Kun lisätään seuraavaa connectoria (esim. uutiset), tämä kannattaa korjata samalla — muuten sukupolvi B kasvaa ja `generate-summary`-funktiosta tulee yhä monimutkaisempi. Liittyy myös: jos halutaan tehdä connector-tason testaus tai kustannusseuranta per-source, yhtenäinen rajapinta on edellytys.
 
-### 2. Mallinvalinta kantaan
+### 2. Mallinvalinta kantaan — ✅ RATKAISTU
 
-- **Mitä:** `prompt_versions.model`-sarake on tällä hetkellä metadata — varsinainen malli on kovakoodattu `_shared/anthropic.ts`:ssä. Sarakkeen pitäisi ohjata `anthropic.ts`:n mallia kutsukohtaisesti.
-- **Miksi ulkona:** Mallinvaihtoon ei ole ollut tarvetta MVP:n jälkeen — Haiku 4.5 on todettu riittäväksi.
-- **Mihin liittyy:** Kun ensimmäisen kerran halutaan vaihtaa malli (esim. Sonnet jotain raskaampaa promptia varten), tehdään tämä samalla. Myös: jos halutaan ottaa eri malli `daily_summary_system` ja `feedback_to_memory` -prompteille, tämä on edellytys.
+- **Mitä oli:** malli oli kovakoodattu `_shared/anthropic.ts`:ssä; oletus että `prompt_versions.model` ohjaisi sitä (saraketta ei tosiasiassa ollut).
+- **Ratkaisu:** malli tulee `user_settings.summary_model`:sta (per-käyttäjä, SettingsPagen dropdown), validoituna allowlistia vasten `_shared/anthropic.ts`:ssä. Mallikohtaiset parametrit (temperature/effort) käsitellään mallikohtaisesti. Mallin vaihto ei vaadi deployta. Kts. `architecture.md` §13.
+- **Jäljellä:** jos joskus halutaan eri malli `feedback_to_memory`-promptille (nyt kiinteä Haiku `anthropic.ts`:ssä), sama allowlist-mekanismi laajenee sinne.
+
+### 2b. Prompt caching Sonnet-malleilla
+
+- **Mitä:** Jos aamupromptin todellinen token-koko (nyt mitattavissa `llm_usage.input_tokens`-kentästä) ylittää 1 024 tokenia, prompt caching muuttuu Sonnet-malleilla kannattavaksi (Sonnetin välimuistiminimi 1 024, Haiku 4.5:n 4 096). Stabiili prefiksi (system-prompt + few-shot) on ehdokas välimuistiin.
+- **Miksi ulkona:** Tietoisesti scopattu ulos mallinvaihto-brieffistä. Kannattavuus riippuu promptin koosta, joka pitää ensin mitata `llm_usage`-datasta.
+- **Mihin liittyy:** Aktivoituu jos siirrytään Sonnet-malliin pysyvästi ja `llm_usage` osoittaa prefiksin olevan > 1 024 tokenia. Toteutus: `cache_control`-breakpoint stabiilin prefiksin loppuun `_shared/anthropic.ts`:ssä.
 
 ### 3. `oauth_states`-taulun siivous
 

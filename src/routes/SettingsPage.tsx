@@ -240,6 +240,7 @@ export default function SettingsPage() {
                 <SelectContent>
                   <SelectItem value="claude-haiku-4-5">Haiku 4.5 — nopeampi, edullisempi</SelectItem>
                   <SelectItem value="claude-sonnet-4-6">Sonnet 4.6 — tarkempi, kalliimpi</SelectItem>
+                  <SelectItem value="claude-sonnet-5">Sonnet 5 — uusin, tehokkain</SelectItem>
                 </SelectContent>
               </Select>
             </div>
