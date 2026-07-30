@@ -194,13 +194,14 @@ Muistin täyttämiseen on suunniteltu kolme polkua:
 
 **Reitit** (kaikki toteutettu): `/login`, `/auth/callback`, `/` (HomePage), `/history`, `/summary/:date`, `/settings`, `/connect-google`, `/connect-todoist`.
 
-**SettingsPage on jaettu kuuteen osioon:**
-1. Aamuyhteenveto (aika, aikavyöhyke, "Generoi nyt", push)
+**SettingsPage on jaettu seitsemään osioon:**
+1. Aamuyhteenveto (aika, aikavyöhyke, "Generoi nyt", mallinvalinta)
 2. Tunne minut paremmin (muistipolku A)
-3. Muistiinpanot (suora muokkaus muistilistaan)
+3. Muistilista (suora muokkaus muistilistaan)
 4. Yhteydet (Google, Todoist; per-connector enable-kytkimet)
-5. Käyttö ja kustannukset (token/€-näkymä, konditionaalinen)
-6. Tili (sähköposti, uloskirjautuminen)
+5. Push-notifikaatiot (selaimen push-tilauksen hallinta)
+6. Kustannukset (token/€-näkymä, konditionaalinen — vain jos käyttödataa on)
+7. Tili (sähköposti, uloskirjautuminen)
 
 ---
 
@@ -227,7 +228,7 @@ Muistin täyttämiseen on suunniteltu kolme polkua:
 
 **Mallikohtaiset parametrit — miksi:** Sonnet 5 hylkää ei-default samplausparametrit (`temperature`/`top_p`/`top_k`) 400-virheellä, joten temperature jätetään pois Sonnet-malleilta. `effort: low` pitää lyhyen generointitehtävän halpana (Sonnet 5:llä adaptive thinking on oletuksena päällä). Haiku 4.5 ei tue effort- eikä adaptive-thinking-parametreja, joten niitä ei aseteta sille.
 
-**Fallback ja logitus:** jokainen LLM-kutsu kirjoittaa `llm_usage`-rivin (tokenit + arvioitu hinta Helsinki-ajan hinnaston mukaan). Jos LLM-kutsu epäonnistuu mistä tahansa syystä, `generateSummaryOrTemplate` palaa deterministiseen templateen (`generated_by = 'template'`), kirjaa `status = 'fallback'` ja lähettää Web Push -hälytyksen vain ylläpitäjälle (`is_admin = true`). Raportti toimitetaan aina.
+**Fallback ja logitus:** jokainen yhteenveto-LLM-kutsu kirjoittaa `llm_usage`-rivin (tokenit + arvioitu hinta Helsinki-ajan hinnaston mukaan). (Huom: muistiehdotusten Haiku-kutsua `generateMemorySuggestion` ei tällä hetkellä logata `llm_usage`-tauluun.) Jos LLM-kutsu epäonnistuu mistä tahansa syystä, `generateSummaryOrTemplate` palaa deterministiseen templateen (`generated_by = 'template'`), kirjaa `status = 'fallback'` ja lähettää Web Push -hälytyksen vain ylläpitäjälle (`is_admin = true`). Raportti toimitetaan aina.
 
 > **ID-varmistus:** allowlistin ID:t on todennettu Anthropicin mallikatalogia vasten. Halutessa ne voi varmistaa ajonaikaisesti kertaluontoisesti: `curl https://api.anthropic.com/v1/models -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01"` ja verrata allowlistiin. Tätä **ei** ole tuotantopolussa.
 

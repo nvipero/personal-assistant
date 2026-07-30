@@ -26,7 +26,7 @@ Pienet bugikorjaukset (kuten aikavyöhykebugi) eivät yleensä vaadi päivityst�
 | Frontend | React + TypeScript + Vite, Tailwind, shadcn/ui, TanStack Query |
 | Hosting | Cloudflare Pages |
 | Backend | Supabase: Postgres + Edge Functions (Deno) + Auth + pg_cron |
-| LLM | Anthropic Claude Haiku 4.5 |
+| LLM | Anthropic Claude — oletus Haiku 4.5, vaihdettavissa (Sonnet 4.6 / Sonnet 5) asetuksista |
 | Push | Web Push (VAPID) |
 
 ## Deploy

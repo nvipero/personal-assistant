@@ -6,7 +6,7 @@ Henkilökohtainen aamuassistentti puhelimeen. Lähettää joka aamu push-notifik
 
 - **Frontend**: Vite + React 18 + TypeScript (strict) + Tailwind CSS v3 + shadcn/ui + React Router v6 + Zustand + TanStack Query v5
 - **Backend**: Supabase (Postgres + Auth + Edge Functions / Deno) + pg_cron + pgcrypto
-- **LLM**: Anthropic Claude Haiku 4.5 (`claude-haiku-4-5`)
+- **LLM**: Anthropic Claude — oletus Haiku 4.5 (`claude-haiku-4-5`), vaihdettavissa per-käyttäjä asetuksista (Sonnet 4.6 / Sonnet 5) ilman deployta, kts. `docs/architecture.md §13`
 - **Push**: Web Push API + VAPID
 - **Hosting**: Cloudflare Pages
 
