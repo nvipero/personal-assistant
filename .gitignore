@@ -34,3 +34,7 @@ supabase/.temp/
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Claude Code — paikalliset asetukset
+.claude/settings.local.json
+.claude/worktrees/
