@@ -1,6 +1,16 @@
 # Päivän Assistentti — Personal Assistant PWA
 
-Henkilökohtainen aamuassistentti puhelimeen. Lähettää joka aamu push-notifikaationa AI-generoidun yhteenvedon Google Kalenterista ja Gmailista. Asennetaan PWA:na suoraan selaimesta kotinäytölle.
+Henkilökohtainen aamuassistentti puhelimeen. Lähettää joka aamu push-notifikaationa LLM:n generoiman yhteenvedon päivästä: kalenteri, sähköposti, tehtävät, sää ja siitepölytilanne. Asennetaan PWA:na suoraan selaimesta kotinäytölle.
+
+Jokainen tietolähde on oma connectorinsa yhteisen rajapinnan takana, ja yksittäisen lähteen virhe ei kaada yhteenvedon generointia — se vain jättää sen osion pois. Promptit ja mallivalinta ovat tietokannassa, eivät koodissa, joten niitä voi vaihtaa ilman deployta. Arkkitehtuuri ja sen perustelut: [`docs/architecture.md`](docs/architecture.md). Tietoisesti ulos-scopatut asiat: [`docs/backlog.md`](docs/backlog.md).
+
+> **In English** — A personal morning-assistant PWA. Every morning it generates
+> an LLM summary of the day from Google Calendar, Gmail, Todoist, the Finnish
+> Meteorological Institute's weather data and a pollen bulletin, then delivers it
+> as a web push notification. Built on Supabase (Postgres, Edge Functions,
+> pg_cron) with a React PWA frontend, running on a self-imposed €10/month
+> budget. Documentation is in Finnish; the code and commit history are in
+> English.
 
 ## Tekninen pino
 
@@ -64,10 +74,15 @@ ALTER DATABASE postgres SET app.service_role_key = 'eyJ...service_role_key...';
 pnpm dlx supabase functions deploy generate-summary
 pnpm dlx supabase functions deploy manual-generate-summary
 pnpm dlx supabase functions deploy google-oauth-handler
+pnpm dlx supabase functions deploy todoist-oauth-start
+pnpm dlx supabase functions deploy todoist-oauth-callback
+pnpm dlx supabase functions deploy fetch-pollen
 pnpm dlx supabase functions deploy push-subscribe
 pnpm dlx supabase functions deploy push-unsubscribe
 pnpm dlx supabase functions deploy feedback-to-memory
 ```
+
+Funktioiden vastuut on kuvattu kohdassa `docs/architecture.md §6`.
 
 ## Secrets (Edge Functions)
 
@@ -77,6 +92,8 @@ Aseta kaikki secrets ennen deployia:
 pnpm dlx supabase secrets set ANTHROPIC_API_KEY=sk-ant-api03-...
 pnpm dlx supabase secrets set GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
 pnpm dlx supabase secrets set GOOGLE_CLIENT_SECRET=GOCSPX-...
+pnpm dlx supabase secrets set TODOIST_CLIENT_ID=...
+pnpm dlx supabase secrets set TODOIST_CLIENT_SECRET=...
 pnpm dlx supabase secrets set VAPID_PUBLIC_KEY=B...
 pnpm dlx supabase secrets set VAPID_PRIVATE_KEY=...
 pnpm dlx supabase secrets set VAPID_SUBJECT=mailto:sinun@email.fi
